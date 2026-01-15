@@ -1,0 +1,13 @@
+{
+  "name": "gamelab-hdl",
+  "version": "1.0.0",
+  "description": "Система геймификации HDL",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'No build process needed'",
+    "dev": "python -m http.server 8000"
+  },
+  "keywords": ["gamelab", "bitrix24", "hdl"],
+  "author": "Your Name",
+  "license": "MIT"
+}
