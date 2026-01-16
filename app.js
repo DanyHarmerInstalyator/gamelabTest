@@ -1,7 +1,7 @@
 // Глобальные переменные
 let currentUser = null;
 let allUsers = [];
-const NATALIA_NAME = "Наталья Сюр"; // Используем имя вместо ID
+const NATALIA_NAME = "Наталья Сюр";
 
 class GameLabApp {
     constructor() {}
@@ -215,7 +215,6 @@ class GameLabApp {
 
     async loadInitialData() {
         try {
-            // Получаем пользователей из Bitrix24 (для аватарок)
             const usersFromBitrix = await this.fetchUsersFromBitrix();
             const bitrixMap = new Map();
             if (usersFromBitrix) {
@@ -224,7 +223,6 @@ class GameLabApp {
                 });
             }
 
-            // Получаем данные из Supabase
             const { data, error } = await window.supabase
                 .from('users')
                 .select('id, name, coins, exp, score');
@@ -280,7 +278,6 @@ class GameLabApp {
             return;
         }
 
-        // Получаем из Supabase
         const { data, error } = await window.supabase
             .from('users')
             .select('*')
@@ -292,15 +289,24 @@ class GameLabApp {
             return;
         }
 
-        // Добавляем аватарку и должность из Bitrix24
-        const bitrixUser = allUsers.find(u => u.name === name);
-        currentUser = {
-            ...data,
-            position: bitrixUser?.position || '—',
-            avatar_url: bitrixUser?.avatar_url || null,
-            avatar_color: bitrixUser?.avatar_color || window.CONFIG.colors[0],
-            avatar_initials: bitrixUser?.avatar_initials || name.charAt(0)
-        };
+        const fullUser = allUsers.find(u => u.name === name);
+        if (fullUser) {
+            currentUser = {
+                ...data,
+                position: fullUser.position,
+                avatar_url: fullUser.avatar_url,
+                avatar_color: fullUser.avatar_color,
+                avatar_initials: fullUser.avatar_initials
+            };
+        } else {
+            currentUser = {
+                ...data,
+                position: '—',
+                avatar_url: null,
+                avatar_color: window.CONFIG.colors[0],
+                avatar_initials: name.charAt(0)
+            };
+        }
 
         document.getElementById('auth-section').style.display = 'none';
         document.getElementById('app').style.display = 'block';
@@ -610,28 +616,47 @@ class GameLabApp {
             .forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.name;
+                option.dataset.id = user.id; // ← сохраняем ID
                 list.appendChild(option);
             });
     }
 
     async submitCoinsOperation() {
-        const targetName = document.getElementById('coins-user-search').value.trim();
+        const searchInput = document.getElementById('coins-user-search');
         const amount = parseInt(document.getElementById('coins-amount').value);
-        
-        if (!targetName || isNaN(amount) || amount <= 0) {
+
+        if (!searchInput.value.trim() || isNaN(amount) || amount <= 0) {
             alert('❌ Некорректные данные');
             return;
         }
 
-        // Находим получателя в Supabase
-        const {  targetData, error: fetchError } = await window.supabase
+        // Получаем ID из datalist
+        let targetId = null;
+        const selectedOption = Array.from(document.getElementById('coins-users-list').options)
+            .find(opt => opt.value === searchInput.value.trim());
+        
+        if (selectedOption) {
+            targetId = selectedOption.dataset.id;
+        } else {
+            // Если не выбран из списка — ищем по имени
+            const found = allUsers.find(u => u.name === searchInput.value.trim());
+            targetId = found?.id;
+        }
+
+        if (!targetId) {
+            alert('❌ Пользователь не найден. Выберите из списка.');
+            return;
+        }
+
+        // Получаем данные пользователя по ID
+        const { data: targetData, error: fetchError } = await window.supabase
             .from('users')
-            .select('id, coins')
-            .eq('name', targetName)
+            .select('id, name, coins')
+            .eq('id', targetId)
             .single();
 
         if (fetchError || !targetData) {
-            alert('❌ Пользователь не найден');
+            alert('❌ Пользователь не найден в базе');
             return;
         }
 
@@ -639,7 +664,7 @@ class GameLabApp {
         const { error: updateError } = await window.supabase
             .from('users')
             .update({ coins: targetData.coins + amount })
-            .eq('name', targetName);
+            .eq('id', targetId);
 
         if (updateError) {
             alert('❌ Ошибка обновления');
@@ -647,7 +672,7 @@ class GameLabApp {
         }
 
         // Обновляем локальные данные
-        const targetUser = allUsers.find(u => u.name === targetName);
+        const targetUser = allUsers.find(u => u.id == targetId);
         if (targetUser) targetUser.coins += amount;
 
         // Обновляем UI
@@ -656,7 +681,7 @@ class GameLabApp {
         this.updateSectionData('rating');
 
         this.closeCoinsModal();
-        alert(`✅ ${amount} Bus‑коинов добавлено ${targetName}`);
+        alert(`✅ ${amount} Bus‑коинов добавлено ${targetData.name}`);
     }
 
     loadPersonalRating() {
@@ -735,7 +760,6 @@ class GameLabApp {
             return;
         }
 
-        // Списываем коины в Supabase
         const { error } = await window.supabase
             .from('users')
             .update({ coins: currentUser.coins - item.price })
@@ -746,10 +770,7 @@ class GameLabApp {
             return;
         }
 
-        // Обновляем локальные данные
         currentUser.coins -= item.price;
-
-        // Обновляем UI
         this.updateProfile();
         this.loadShopItems();
 
@@ -757,7 +778,7 @@ class GameLabApp {
     }
 }
 
-// Делаем функции глобальными для HTML
+// Глобальные функции
 window.app = new GameLabApp();
 window.login = () => app.login();
 window.logout = () => app.logout();
