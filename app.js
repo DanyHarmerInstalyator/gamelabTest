@@ -4,7 +4,9 @@ let allUsers = [];
 const NATALIA_NAME = "Наталья Сюр";
 
 class GameLabApp {
-    constructor() {}
+    constructor() {
+        this.currentOperation = 'add'; // 'add' или 'deduct'
+    }
 
     getBitrixWebhook() {
         return (window.CONFIG?.bitrixWebhook || '').trim();
@@ -511,6 +513,9 @@ class GameLabApp {
                 this.loadAchievements();
                 this.loadPersonalRating();
                 break;
+            case 'history':
+                this.loadHistory();
+                break;
         }
     }
 
@@ -585,6 +590,7 @@ class GameLabApp {
     showAddCoinsModal() {
         document.getElementById('coins-modal-title').textContent = 'Добавить Bus‑коины';
         document.getElementById('coins-modal-action-text').textContent = 'Добавить';
+        this.currentOperation = 'add';
         this.setupCoinsUserList();
         document.getElementById('coins-modal').classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -593,6 +599,7 @@ class GameLabApp {
     showDeductCoinsModal() {
         document.getElementById('coins-modal-title').textContent = 'Списать Bus‑коины';
         document.getElementById('coins-modal-action-text').textContent = 'Списать';
+        this.currentOperation = 'deduct';
         this.setupCoinsUserList();
         document.getElementById('coins-modal').classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -616,7 +623,7 @@ class GameLabApp {
             .forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.name;
-                option.dataset.id = user.id; // ← сохраняем ID
+                option.dataset.id = user.id;
                 list.appendChild(option);
             });
     }
@@ -630,7 +637,6 @@ class GameLabApp {
             return;
         }
 
-        // Получаем ID из datalist
         let targetId = null;
         const selectedOption = Array.from(document.getElementById('coins-users-list').options)
             .find(opt => opt.value === searchInput.value.trim());
@@ -638,7 +644,6 @@ class GameLabApp {
         if (selectedOption) {
             targetId = selectedOption.dataset.id;
         } else {
-            // Если не выбран из списка — ищем по имени
             const found = allUsers.find(u => u.name === searchInput.value.trim());
             targetId = found?.id;
         }
@@ -648,8 +653,7 @@ class GameLabApp {
             return;
         }
 
-        // Получаем данные пользователя по ID
-        const { data: targetData, error: fetchError } = await window.supabase
+        const {  targetData, error: fetchError } = await window.supabase
             .from('users')
             .select('id, name, coins')
             .eq('id', targetId)
@@ -660,10 +664,20 @@ class GameLabApp {
             return;
         }
 
-        // Обновляем баланс
+        let newCoins;
+        if (this.currentOperation === 'add') {
+            newCoins = targetData.coins + amount;
+        } else if (this.currentOperation === 'deduct') {
+            newCoins = targetData.coins - amount;
+            if (newCoins < 0) {
+                alert('❌ Недостаточно коинов у пользователя');
+                return;
+            }
+        }
+
         const { error: updateError } = await window.supabase
             .from('users')
-            .update({ coins: targetData.coins + amount })
+            .update({ coins: newCoins })
             .eq('id', targetId);
 
         if (updateError) {
@@ -671,17 +685,33 @@ class GameLabApp {
             return;
         }
 
-        // Обновляем локальные данные
-        const targetUser = allUsers.find(u => u.id == targetId);
-        if (targetUser) targetUser.coins += amount;
+        // Сохраняем транзакцию
+        const { error: txError } = await window.supabase
+            .from('transactions')
+            .insert({
+                user_id: targetId,
+                admin_id: currentUser.id,
+                action: this.currentOperation,
+                amount: amount,
+                resource: 'coins',
+                comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
+            });
 
-        // Обновляем UI
+        if (txError) {
+            console.warn('⚠️ Не удалось сохранить транзакцию:', txError);
+        }
+
+        const targetUser = allUsers.find(u => u.id == targetId);
+        if (targetUser) targetUser.coins = newCoins;
+
         this.updateUI();
         this.updateSectionData('colleagues');
         this.updateSectionData('rating');
 
         this.closeCoinsModal();
-        alert(`✅ ${amount} Bus‑коинов добавлено ${targetData.name}`);
+
+        const actionText = this.currentOperation === 'add' ? 'добавлено' : 'списано';
+        alert(`✅ ${amount} Bus‑коинов ${actionText} ${targetData.name}`);
     }
 
     loadPersonalRating() {
@@ -746,6 +776,77 @@ class GameLabApp {
                 </div>
             </div>
         `).join('');
+    }
+
+    async loadHistory() {
+        const el = document.getElementById('history-list');
+        if (!el || !currentUser) return;
+
+        let history = [];
+
+        if (this.isNatalia()) {
+            // История операций Натальи как админа
+            const { data, error } = await window.supabase
+                .from('transactions')
+                .select('user_id, action, amount, resource, comment, timestamp')
+                .eq('admin_id', currentUser.id)
+                .order('timestamp', { ascending: false })
+                .limit(50);
+
+            if (error) {
+                console.error('Ошибка загрузки истории:', error);
+                el.innerHTML = '<div class="loading-text">Ошибка загрузки</div>';
+                return;
+            }
+
+            if (data.length > 0) {
+                const userIds = [...new Set(data.map(t => t.user_id))];
+                const {  usersData } = await window.supabase
+                    .from('users')
+                    .select('id, name')
+                    .in('id', userIds);
+
+                const userMap = new Map(usersData.map(u => [u.id, u.name]));
+
+                history = data.map(item => ({
+                    date: item.timestamp,
+                    resource: item.resource,
+                    amount: item.action === 'add' ? item.amount : -item.amount,
+                    admin: 'Вы',
+                    comment: item.comment || `Операция: ${item.action}`,
+                    target: userMap.get(item.user_id) || 'Неизвестный'
+                }));
+            }
+        } else {
+            // Для обычных пользователей — можно оставить пусто или добавить их личную историю позже
+            history = [];
+        }
+
+        el.innerHTML = history.length
+            ? history.map(item => {
+                const d = new Date(item.date);
+                const day = d.getDate();
+                const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+                const month = months[d.getMonth()];
+                const year = d.getFullYear();
+                const formattedDate = `${day} ${month} ${year}`;
+
+                const isPositive = item.amount > 0;
+                const amountText = `${isPositive ? '+' : ''}${item.amount}`;
+
+                return `
+                    <div class="history-item fade-in">
+                        <div style="color: #666; min-width: 100px;">${formattedDate}</div>
+                        <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
+                            <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
+                            ${amountText}
+                        </div>
+                        <div style="min-width: 120px;">${item.target}</div>
+                        <div style="flex-grow: 1; color: #666;">${item.comment}</div>
+                    </div>
+                `;
+            }).join('')
+            : '<div class="loading-text">История операций пуста</div>';
     }
 
     async buyItem(itemId) {
