@@ -1,13 +1,11 @@
 // Глобальные переменные
 let currentUser = null;
 let allUsers = [];
-const NATALIA_ID = 175; // ID Натальи Сюр в Bitrix24
+const NATALIA_NAME = "Наталья Сюр";
 
 class GameLabApp {
-    constructor() {}
-
-    getApiUrl() {
-        return window.CONFIG.apiBaseUrl || '';
+    constructor() {
+        this.currentOperation = 'add'; // 'add' или 'deduct'
     }
 
     getBitrixWebhook() {
@@ -116,15 +114,6 @@ class GameLabApp {
     }
 
     setupEventListeners() {
-        const coinsUserSearch = document.getElementById('coins-user-search');
-        if (coinsUserSearch) {
-            coinsUserSearch.addEventListener('input', (e) => {
-                const errorEl = document.getElementById('coins-user-error');
-                if (errorEl && e.target.value.trim()) {
-                    errorEl.style.display = 'none';
-                }
-            });
-        }
         const userSearch = document.getElementById('user-search');
         const colleagueSearch = document.getElementById('colleague-search');
         
@@ -166,10 +155,7 @@ class GameLabApp {
     async fetchUsersFromBitrix() {
         try {
             const webhook = this.getBitrixWebhook();
-            if (!webhook) {
-                console.warn('Bitrix webhook не задан в config.js');
-                return null;
-            }
+            if (!webhook) return null;
 
             const response = await fetch(webhook + 'user.get', {
                 method: 'POST',
@@ -178,13 +164,9 @@ class GameLabApp {
             });
 
             const data = await response.json();
-            if (data.error) {
-                console.error('Ошибка Bitrix24 API:', data.error_description || data.error);
-                return null;
-            }
-            return data.result;
+            return data.result || [];
         } catch (error) {
-            console.error('Не удалось подключиться к Bitrix24:', error);
+            console.warn('⚠️ Bitrix24 недоступен');
             return null;
         }
     }
@@ -213,13 +195,9 @@ class GameLabApp {
             id,
             name: name.trim() || 'Аноним',
             position: bxUser.WORK_POSITION || '—',
-            email: bxUser.EMAIL || '',
             avatar_url: avatarUrl,
             avatar_color: color,
-            avatar_initials: initials || '?',
-            coins: 0,
-            exp: 0,
-            score: 0
+            avatar_initials: initials || '?'
         };
     }
 
@@ -228,150 +206,107 @@ class GameLabApp {
             id: 1673,
             name: "Дмитрий Бралковский",
             position: "Менеджер по закупкам",
-            email: "d.bralkovskiy@hdl.ru",
             avatar_url: null,
             avatar_color: window.CONFIG.colors[0],
             avatar_initials: "ДБ",
-            coins: 150,
-            exp: 320,
-            score: 45
+            coins: 500,
+            exp: 300,
+            score: 10
         }];
     }
 
     async loadInitialData() {
-        const loadingElement = document.getElementById('loading');
-        if (loadingElement) {
-            loadingElement.style.display = 'block';
-            loadingElement.textContent = '⏳ Загрузка данных из Bitrix24 и балансов...';
-        }
         try {
-            const bxUsers = await this.fetchUsersFromBitrix();
-            let usersWithUI = [];
-            if (!bxUsers || bxUsers.length === 0) {
-                console.warn('⚠️ Bitrix24: пустой ответ. Используем тестовых.');
-                usersWithUI = this.getMockUsers();
-            } else {
-                usersWithUI = bxUsers.map(user => this.transformBitrixUser(user));
+            const usersFromBitrix = await this.fetchUsersFromBitrix();
+            const bitrixMap = new Map();
+            if (usersFromBitrix) {
+                usersFromBitrix.forEach(user => {
+                    bitrixMap.set(parseInt(user.ID), this.transformBitrixUser(user));
+                });
             }
 
-            const apiUrl = this.getApiUrl();
-            const response = await fetch(`${apiUrl}/api/users`);
-            if (!response.ok) {
-                console.error('❌ Не удалось загрузить балансы из API:', response.status);
-                allUsers = usersWithUI;
-                this.setupUserAutocomplete();
-                return;
-            }
-            const backendUsers = await response.json();
-            const backendMap = new Map();
-            backendUsers.forEach(u => {
-                backendMap.set(u.name, u);
-            });
-            allUsers = usersWithUI.map(uiUser => {
-                const backendUser = backendMap.get(uiUser.name);
+            const { data, error } = await window.supabase
+                .from('users')
+                .select('id, name, coins, exp, score');
+
+            if (error) throw error;
+
+            allUsers = data.map(su => {
+                const bitrix = bitrixMap.get(su.id) || {};
                 return {
-                    ...uiUser,
-                    coins: backendUser?.coins || 0,
-                    exp: backendUser?.exp || 0,
-                    score: backendUser?.score || 0
+                    id: su.id,
+                    name: su.name,
+                    position: bitrix.position || '—',
+                    avatar_url: bitrix.avatar_url || null,
+                    avatar_color: bitrix.avatar_color || window.CONFIG.colors[0],
+                    avatar_initials: bitrix.avatar_initials || su.name.charAt(0),
+                    coins: su.coins,
+                    exp: su.exp,
+                    score: su.score
                 };
             });
+
             console.log('✅ Загружено пользователей:', allUsers.length);
             this.setupUserAutocomplete();
-        } catch (err) {
-            console.error('Ошибка загрузки:', err);
+        } catch (error) {
+            console.error('❌ Ошибка загрузки данных:', error);
             allUsers = this.getMockUsers();
-        } finally {
-            if (loadingElement) {
-                loadingElement.style.display = 'none';
-            }
+            this.setupUserAutocomplete();
         }
     }
 
     setupUserAutocomplete() {
-        const usersList = document.getElementById('users-list');
-        if (!usersList) return;
-        usersList.innerHTML = '';
+        const list = document.getElementById('users-list');
+        if (!list) return;
+        list.innerHTML = '';
         allUsers.forEach(user => {
             const option = document.createElement('option');
             option.value = user.name;
-            usersList.appendChild(option);
+            list.appendChild(option);
         });
     }
 
     handleUserSearch(searchTerm) {
-        const errorElement = document.getElementById('auth-error');
-        if (errorElement && searchTerm.length > 0) {
-            errorElement.style.display = 'none';
-        }
+        const el = document.getElementById('auth-error');
+        if (el && searchTerm.length > 0) el.style.display = 'none';
     }
 
-    login() {
-        const searchInput = document.getElementById('user-search');
-        const passwordInput = document.getElementById('user-password');
-        if (!searchInput || !passwordInput) {
-            console.error('Не найдены поля ввода');
-            return;
-        }
-        const name = searchInput.value.trim();
-        const password = passwordInput.value.trim();
+    async login() {
+        const name = document.getElementById('user-search')?.value.trim();
+        const password = document.getElementById('user-password')?.value.trim();
+
         if (!name || !password) {
             this.showError('auth-error', 'Введите имя и пароль');
             return;
         }
 
-        const apiUrl = this.getApiUrl();
-        const loading = document.getElementById('loading');
-        loading.textContent = '⏳ Подключение к серверу...';
-        loading.style.display = 'block';
+        const { data, error } = await window.supabase
+            .from('users')
+            .select('*')
+            .eq('name', name)
+            .single();
 
-        const attemptLogin = (retries = 3) => {
-            fetch(`${apiUrl}/api/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, password })
-            })
-            .then(res => {
-                loading.style.display = 'none';
-                if (res.status === 422 && retries > 0) {
-                    this.showError('auth-error', `Сервер запускается... Попытка ${4 - retries}/3`);
-                    setTimeout(() => attemptLogin(retries - 1), 15000);
-                    return;
-                }
-                if (!res.ok) {
-                    if (res.status === 401) {
-                        this.showError('auth-error', 'Неверное имя или пароль');
-                    } else {
-                        this.showError('auth-error', `Ошибка сервера: ${res.status}`);
-                    }
-                    throw new Error();
-                }
-                return res.json();
-            })
-            .then(user => {
-                const bitrixUser = allUsers.find(u => u.name === user.name);
-                currentUser = {
-                    ...user,
-                    position: bitrixUser?.position || '—',
-                    avatar_url: bitrixUser?.avatar_url,
-                    avatar_color: bitrixUser?.avatar_color,
-                    avatar_initials: bitrixUser?.avatar_initials || user.name.split(' ').map(n => n[0]).join('').toUpperCase()
-                };
-                localStorage.setItem('gamelab_session_token', user.session_token);
-                localStorage.setItem('gamelab_user_name', user.name);
-                document.getElementById('auth-section').style.display = 'none';
-                document.getElementById('app').style.display = 'block';
-                this.updateUI();
-            })
-            .catch(() => {});
+        if (error || !data) {
+            this.showError('auth-error', 'Пользователь не найден');
+            return;
+        }
+
+        const fullUser = allUsers.find(u => u.name === name);
+        currentUser = {
+            ...data,
+            position: fullUser?.position || '—',
+            avatar_url: fullUser?.avatar_url || null,
+            avatar_color: fullUser?.avatar_color || window.CONFIG.colors[0],
+            avatar_initials: fullUser?.avatar_initials || name.charAt(0)
         };
-        attemptLogin();
+
+        document.getElementById('auth-section').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        this.updateUI();
     }
 
     logout() {
         currentUser = null;
-        localStorage.removeItem('gamelab_session_token');
-        localStorage.removeItem('gamelab_user_name');
         document.getElementById('auth-section').style.display = 'block';
         document.getElementById('app').style.display = 'none';
         document.getElementById('user-search').value = '';
@@ -380,14 +315,12 @@ class GameLabApp {
 
     updateUI() {
         if (!currentUser) return;
-        document.getElementById('auth-section').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
         this.updateProfile();
         this.updateSectionData('profile');
     }
 
     isNatalia() {
-        return currentUser && currentUser.id === NATALIA_ID;
+        return currentUser && currentUser.name.includes(NATALIA_NAME);
     }
 
     updateProfile() {
@@ -398,21 +331,21 @@ class GameLabApp {
         this.setElementText('profile-score', currentUser.score);
         this.updateAvatar('profile-avatar', currentUser);
 
-        const nataliaActions = document.getElementById('natalia-actions');
+        const actions = document.getElementById('natalia-actions');
         if (this.isNatalia()) {
-            if (!nataliaActions) {
-                const actionsDiv = document.createElement('div');
-                actionsDiv.id = 'natalia-actions';
-                actionsDiv.innerHTML = `
+            if (!actions) {
+                const div = document.createElement('div');
+                div.id = 'natalia-actions';
+                div.innerHTML = `
                     <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn" onclick="app.showAddCoinsModal()">➕ Добавить Bus‑коины</button>
                         <button class="btn" onclick="app.showDeductCoinsModal()">➖ Списать Bus‑коины</button>
                     </div>
                 `;
-                document.querySelector('.profile-info').appendChild(actionsDiv);
+                document.querySelector('.profile-info').appendChild(div);
             }
-        } else if (nataliaActions) {
-            nataliaActions.remove();
+        } else if (actions) {
+            actions.remove();
         }
     }
 
@@ -438,9 +371,7 @@ class GameLabApp {
                     avatar.style.backgroundImage = `url('${user.avatar_url}')`;
                 }
             };
-            img.onerror = () => {
-                this.showAvatarInitials(avatar, user);
-            };
+            img.onerror = () => this.showAvatarInitials(avatar, user);
             img.src = user.avatar_url + '?v=' + Date.now();
         } else {
             this.showAvatarInitials(avatar, user);
@@ -454,22 +385,22 @@ class GameLabApp {
     }
 
     loadColleaguesList(searchTerm = '') {
-        const colleaguesList = document.getElementById('colleagues-list');
-        if (!colleaguesList) return;
-        colleaguesList.innerHTML = '<div class="loading-text">Загрузка...</div>';
+        const list = document.getElementById('colleagues-list');
+        if (!list) return;
+        list.innerHTML = '<div class="loading-text">Загрузка...</div>';
 
         setTimeout(() => {
-            const filtered = allUsers.filter(u =>
-                u.id !== currentUser?.id &&
+            const filtered = allUsers.filter(u => 
+                u.id !== currentUser?.id && 
                 u.name.toLowerCase().includes(searchTerm.toLowerCase())
             );
             
-            colleaguesList.innerHTML = filtered.length
+            list.innerHTML = filtered.length
                 ? filtered.map(user => {
                     const hasAvatar = !!user.avatar_url;
                     return `
                         <div class="user-item fade-in" data-user-id="${user.id}">
-                            <div class="avatar ${hasAvatar ? '' : 'initials'}"
+                            <div class="avatar ${hasAvatar ? '' : 'initials'}" 
                                  style="${hasAvatar ? `background-image: url('${user.avatar_url}?v=${Date.now()}')` : `background-color: ${user.avatar_color}`}">
                                 ${hasAvatar ? '' : user.avatar_initials}
                             </div>
@@ -496,7 +427,7 @@ class GameLabApp {
                 }).join('')
                 : '<div class="loading-text">Коллеги не найдены</div>';
 
-            colleaguesList.querySelectorAll('.user-item').forEach(item => {
+            list.querySelectorAll('.user-item').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const userId = parseInt(e.currentTarget.dataset.userId);
                     const user = allUsers.find(u => u.id === userId);
@@ -588,7 +519,7 @@ class GameLabApp {
                     <img src="./img/coin.svg" alt="Coins" style="width: 16px; height: 16px; margin-right: 5px;">
                     ${item.price} Bus‑коин
                 </div>
-                <button class="btn" onclick="app.buyItem(${item.id})"
+                <button class="btn" onclick="app.buyItem(${item.id})" 
                         ${currentUser?.coins >= item.price ? '' : 'disabled'}>
                     Купить
                 </button>
@@ -669,8 +600,6 @@ class GameLabApp {
             document.body.style.overflow = '';
             document.getElementById('coins-user-search').value = '';
             document.getElementById('coins-amount').value = '';
-            document.getElementById('coins-user-error').style.display = 'none';
-            document.getElementById('coins-amount-error').style.display = 'none';
         }
     }
 
@@ -678,46 +607,33 @@ class GameLabApp {
         const list = document.getElementById('coins-users-list');
         list.innerHTML = '';
         allUsers
-            .filter(u => u.id !== NATALIA_ID)
+            .filter(u => !u.name.includes(NATALIA_NAME))
             .forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.name;
-                option.dataset.userId = user.id; // ← сохраняем ID
+                option.dataset.id = user.id;
                 list.appendChild(option);
             });
     }
 
-    submitCoinsOperation() {
+    async submitCoinsOperation() {
         const searchInput = document.getElementById('coins-user-search');
-        const amountInput = document.getElementById('coins-amount');
-        const userError = document.getElementById('coins-user-error');
-        const amountError = document.getElementById('coins-amount-error');
+        const amount = parseInt(document.getElementById('coins-amount').value);
 
-        userError.style.display = 'none';
-        amountError.style.display = 'none';
-
-        const targetName = searchInput.value.trim();
-        const amount = parseInt(amountInput.value);
-        const adminName = currentUser.name;
-        const adminPassword = "trusted_admin";
-
-        if (!targetName) {
-            userError.style.display = 'block';
-            return;
-        }
-        if (!amount || amount <= 0 || isNaN(amount)) {
-            amountError.style.display = 'block';
+        if (!searchInput.value.trim() || isNaN(amount) || amount <= 0) {
+            alert('❌ Некорректные данные');
             return;
         }
 
-        // === ИСПРАВЛЕНИЕ: получаем ID из datalist ===
         let targetId = null;
-        const options = document.querySelectorAll('#coins-users-list option');
-        for (const opt of options) {
-            if (opt.value === targetName) {
-                targetId = parseInt(opt.dataset.userId);
-                break;
-            }
+        const selectedOption = Array.from(document.getElementById('coins-users-list').options)
+            .find(opt => opt.value === searchInput.value.trim());
+        
+        if (selectedOption) {
+            targetId = selectedOption.dataset.id;
+        } else {
+            const found = allUsers.find(u => u.name === searchInput.value.trim());
+            targetId = found?.id;
         }
 
         if (!targetId) {
@@ -725,43 +641,65 @@ class GameLabApp {
             return;
         }
 
-        const apiUrl = this.getApiUrl();
-        fetch(`${apiUrl}/api/coins/add`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                target_name: targetName,
+        const {  targetData, error: fetchError } = await window.supabase
+            .from('users')
+            .select('id, name, coins')
+            .eq('id', targetId)
+            .single();
+
+        if (fetchError || !targetData) {
+            alert('❌ Пользователь не найден в базе');
+            return;
+        }
+
+        let newCoins;
+        if (this.currentOperation === 'add') {
+            newCoins = targetData.coins + amount;
+        } else if (this.currentOperation === 'deduct') {
+            newCoins = targetData.coins - amount;
+            if (newCoins < 0) {
+                alert('❌ Недостаточно коинов у пользователя');
+                return;
+            }
+        }
+
+        const { error: updateError } = await window.supabase
+            .from('users')
+            .update({ coins: newCoins })
+            .eq('id', targetId);
+
+        if (updateError) {
+            alert('❌ Ошибка обновления');
+            return;
+        }
+
+        // Сохраняем транзакцию
+        const { error: txError } = await window.supabase
+            .from('transactions')
+            .insert({
+                user_id: targetId,
+                admin_id: currentUser.id,
+                action: this.currentOperation,
                 amount: amount,
-                admin_name: adminName,
-                admin_password: adminPassword
-            })
-        })
-        .then(res => {
-            if (!res.ok) {
-                return res.json().then(err => {
-                    throw new Error(err.detail || 'Ошибка сервера');
-                });
-            }
-            return res.json();
-        })
-        .then(data => {
-            alert(data.message);
-            this.closeCoinsModal();
+                resource: 'coins',
+                comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
+            });
 
-            // Обновляем локальные данные
-            const userToUpdate = allUsers.find(u => u.id === targetId);
-            if (userToUpdate) {
-                userToUpdate.coins += amount;
-            }
+        if (txError) {
+            console.warn('⚠️ Не удалось сохранить транзакцию:', txError);
+        }
 
-            // Обновляем UI
-            this.updateUI();
-            this.updateSectionData('colleagues');
-            this.updateSectionData('rating');
-        })
-        .catch(err => {
-            alert('❌ ' + err.message);
-        });
+        const targetUser = allUsers.find(u => u.id == targetId);
+        if (targetUser) targetUser.coins = newCoins;
+
+        this.updateUI();
+        this.updateSectionData('colleagues');
+        this.updateSectionData('rating');
+
+        this.closeCoinsModal();
+
+        const actionText = this.currentOperation === 'add' ? 'добавлено' : 'списано';
+        alert(`✅ ${amount} Bus‑коинов ${actionText} ${targetData.name}`);
     }
 
     loadPersonalRating() {
@@ -811,7 +749,7 @@ class GameLabApp {
                     <div style="font-weight: bold; color: #ff9800; min-width: 30px; text-align: center;">
                         ${i + 1}
                     </div>
-                    <div class="avatar ${user.avatar_url ? '' : 'initials'}"
+                    <div class="avatar ${user.avatar_url ? '' : 'initials'}" 
                          style="width: 40px; height: 40px; margin-right: 12px; ${user.avatar_url ? `background-image: url('${user.avatar_url}?v=${Date.now()}')` : `background-color: ${user.avatar_color}`}">
                         ${user.avatar_url ? '' : user.avatar_initials}
                     </div>
@@ -832,151 +770,113 @@ class GameLabApp {
         const el = document.getElementById('history-list');
         if (!el || !currentUser) return;
 
-        try {
-            const apiUrl = this.getApiUrl();
-            const response = await fetch(`${apiUrl}/api/history/${currentUser.id}`);
-            if (!response.ok) throw new Error('Не удалось загрузить историю');
-            const history = await response.json();
+        let history = [];
 
-            el.innerHTML = history.length
-                ? history.map(item => {
-                    const d = new Date(item.date);
-                    const day = d.getDate();
-                    const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-                    const month = months[d.getMonth()];
-                    const year = d.getFullYear();
-                    const formattedDate = `${day} ${month} ${year}`;
+        if (this.isNatalia()) {
+            const { data, error } = await window.supabase
+                .from('transactions')
+                .select('user_id, action, amount, resource, comment, timestamp')
+                .eq('admin_id', currentUser.id)
+                .order('timestamp', { ascending: false })
+                .limit(50);
 
-                    let iconSrc = './img/coin.svg';
-                    let resourceLabel = 'Bus‑коин';
-                    if (item.resource === 'exp') {
-                        iconSrc = './img/exp.svg';
-                        resourceLabel = 'Опыт';
-                    } else if (item.resource === 'score') {
-                        iconSrc = './img/score.svg';
-                        resourceLabel = 'Очки';
-                    }
+            if (error) {
+                console.error('Ошибка загрузки истории:', error);
+                el.innerHTML = '<div class="loading-text">Ошибка загрузки</div>';
+                return;
+            }
 
-                    const isPositive = item.amount > 0;
-                    const amountText = `${isPositive ? '+' : ''}${item.amount}`;
+            if (data.length > 0) {
+                const userIds = [...new Set(data.map(t => t.user_id))];
+                const {  usersData } = await window.supabase
+                    .from('users')
+                    .select('id, name')
+                    .in('id', userIds);
 
-                    return `
-                        <div class="history-item fade-in">
-                            <div style="color: #666; min-width: 100px;">${formattedDate}</div>
-                            <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
-                                <img src="${iconSrc}" alt="${resourceLabel}" style="width: 14px; height: 14px;">
-                                ${amountText}
-                            </div>
-                            <div style="min-width: 120px;">${item.admin}</div>
-                            <div style="flex-grow: 1; color: #666;">${item.comment}</div>
-                        </div>
-                    `;
-                }).join('')
-                : '<div class="loading-text">История операций пуста</div>';
-        } catch (err) {
-            console.error('Ошибка загрузки истории:', err);
-            el.innerHTML = '<div class="loading-text">Ошибка загрузки истории</div>';
+                const userMap = new Map(usersData.map(u => [u.id, u.name]));
+
+                history = data.map(item => ({
+                    date: item.timestamp,
+                    resource: item.resource,
+                    amount: item.action === 'add' ? item.amount : -item.amount,
+                    admin: 'Вы',
+                    comment: item.comment || `Операция: ${item.action}`,
+                    target: userMap.get(item.user_id) || 'Неизвестный'
+                }));
+            }
         }
+
+        el.innerHTML = history.length
+            ? history.map(item => {
+                const d = new Date(item.date);
+                const day = d.getDate();
+                const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+                const month = months[d.getMonth()];
+                const year = d.getFullYear();
+                const formattedDate = `${day} ${month} ${year}`;
+
+                const isPositive = item.amount > 0;
+                const amountText = `${isPositive ? '+' : ''}${item.amount}`;
+
+                return `
+                    <div class="history-item fade-in">
+                        <div style="color: #666; min-width: 100px;">${formattedDate}</div>
+                        <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
+                            <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
+                            ${amountText}
+                        </div>
+                        <div style="min-width: 120px;">${item.target}</div>
+                        <div style="flex-grow: 1; color: #666;">${item.comment}</div>
+                    </div>
+                `;
+            }).join('')
+            : '<div class="loading-text">История операций пуста</div>';
     }
 
     async buyItem(itemId) {
         const item = window.SHOP_ITEMS.find(i => i.id === itemId);
         if (!item || !currentUser) {
-            alert('❌ Товар не найден или вы не авторизованы');
+            alert('❌ Товар не найден');
             return;
         }
 
         if (currentUser.coins < item.price) {
-            alert('❌ Недостаточно Bus‑коинов для покупки');
+            alert('❌ Недостаточно Bus‑коинов');
             return;
         }
 
-        const password = prompt("Введите ваш пароль для подтверждения покупки:", "");
-        if (!password) {
+        const { error } = await window.supabase
+            .from('users')
+            .update({ coins: currentUser.coins - item.price })
+            .eq('id', currentUser.id);
+
+        if (error) {
+            alert('❌ Ошибка покупки');
             return;
         }
 
-        try {
-            const apiUrl = this.getApiUrl();
-            const response = await fetch(`${apiUrl}/api/coins/spend`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    target_name: currentUser.name,
-                    amount: item.price,
-                    password: password
-                })
-            });
+        currentUser.coins -= item.price;
+        this.updateProfile();
+        this.loadShopItems();
 
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.detail || 'Ошибка при покупке');
-            }
-
-            currentUser.coins = result.new_balance;
-            this.updateProfile();
-            this.loadShopItems();
-            this.updateSectionData('history');
-
-            alert(`✅ Товар "${item.name}" успешно куплен!`);
-        } catch (err) {
-            console.error('Ошибка покупки:', err);
-            alert('❌ ' + err.message);
-        }
+        alert(`✅ Товар "${item.name}" успешно куплен!`);
     }
 }
 
 // Глобальные функции
-function login() { app.login(); }
-function logout() { app.logout(); }
-function showSection(id) { app.showSection(id); }
-function buyItem(id) { app.buyItem(id); }
-function closeUserModal() { app.closeUserModal(); }
-function closeItemModal() { app.closeItemModal(); }
-function closeCoinsModal() { app.closeCoinsModal(); }
-function submitCoinsOperation() { app.submitCoinsOperation(); }
+window.app = new GameLabApp();
+window.login = () => app.login();
+window.logout = () => app.logout();
+window.showSection = (id) => app.showSection(id);
+window.buyItem = (id) => app.buyItem(id);
+window.closeUserModal = () => app.closeUserModal();
+window.closeItemModal = () => app.closeItemModal();
+window.closeCoinsModal = () => app.closeCoinsModal();
+window.submitCoinsOperation = () => app.submitCoinsOperation();
 
-// Инициализация после загрузки DOM
+// Инициализация
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new GameLabApp();
     app.setupEventListeners();
     app.setupModalClose();
-    app.loadInitialData().then(() => {
-        const token = localStorage.getItem('gamelab_session_token');
-        const userName = localStorage.getItem('gamelab_user_name');
-        if (token && userName) {
-            fetch(`${app.getApiUrl()}/api/session/validate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token })
-            })
-            .then(res => {
-                if (res.ok) return res.json();
-                else throw new Error();
-            })
-            .then(userData => {
-                const bitrixUser = allUsers.find(u => u.name === userData.name);
-                currentUser = {
-                    id: userData.id,
-                    name: userData.name,
-                    position: bitrixUser?.position || '—',
-                    avatar_url: bitrixUser?.avatar_url,
-                    avatar_color: bitrixUser?.avatar_color,
-                    avatar_initials: bitrixUser?.avatar_initials || userData.name.split(' ').map(n => n[0]).join('').toUpperCase(),
-                    coins: userData.coins,
-                    exp: userData.exp,
-                    score: userData.score
-                };
-                document.getElementById('auth-section').style.display = 'none';
-                document.getElementById('app').style.display = 'block';
-                app.updateUI();
-            })
-            .catch(() => {
-                localStorage.removeItem('gamelab_session_token');
-                localStorage.removeItem('gamelab_user_name');
-                document.getElementById('auth-section').style.display = 'block';
-                document.getElementById('app').style.display = 'none';
-            });
-        }
-    });
+    app.loadInitialData();
 });
