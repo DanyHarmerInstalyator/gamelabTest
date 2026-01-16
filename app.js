@@ -740,14 +740,15 @@ class GameLabApp {
 }
 
 // Глобальные функции
-function login() { app.login(); }
-function logout() { app.logout(); }
-function showSection(id) { app.showSection(id); }
-function buyItem(id) { app.buyItem(id); }
-function closeUserModal() { app.closeUserModal(); }
-function closeItemModal() { app.closeItemModal(); }
-function closeCoinsModal() { app.closeCoinsModal(); }
-function submitCoinsOperation() { app.submitCoinsOperation(); }
+// Делаем функции доступными из HTML
+window.login = () => app.login();
+window.logout = () => app.logout();
+window.showSection = (id) => app.showSection(id);
+window.buyItem = (id) => app.buyItem(id);
+window.closeUserModal = () => app.closeUserModal();
+window.closeItemModal = () => app.closeItemModal();
+window.closeCoinsModal = () => app.closeCoinsModal();
+window.submitCoinsOperation = () => app.submitCoinsOperation();
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
