@@ -321,20 +321,19 @@ class GameLabApp {
     }
 
     const bitrixUser = allUsers.find(u => 
-    u.name.toLowerCase().includes(name.toLowerCase().trim())
-);
+        u.name.toLowerCase().includes(name.toLowerCase())
+    );
+
     if (!bitrixUser) {
         this.showError('auth-error', 'Пользователь не найден в Bitrix24');
         return;
     }
 
-    // Демо-балансы (не сохраняются)
     currentUser = {
         ...bitrixUser,
-        coins: 500,
-        exp: 300,
-        score: 10,
-        session_token: "demo"
+        coins: bitrixUser.coins || 500, // берём из памяти или ставим демо
+        exp: bitrixUser.exp || 300,
+        score: bitrixUser.score || 10
     };
 
     document.getElementById('auth-section').style.display = 'none';
@@ -660,81 +659,49 @@ class GameLabApp {
     }
 
     submitCoinsOperation() {
-        const searchInput = document.getElementById('coins-user-search');
-        const amountInput = document.getElementById('coins-amount');
-        const userError = document.getElementById('coins-user-error');
-        const amountError = document.getElementById('coins-amount-error');
+    const searchInput = document.getElementById('coins-user-search');
+    const amountInput = document.getElementById('coins-amount');
+    const userError = document.getElementById('coins-user-error');
+    const amountError = document.getElementById('coins-amount-error');
 
-        userError.style.display = 'none';
-        amountError.style.display = 'none';
+    userError.style.display = 'none';
+    amountError.style.display = 'none';
 
-        const targetName = searchInput.value.trim();
-        const amount = parseInt(amountInput.value);
-        const adminName = currentUser.name;
-        const adminPassword = "trusted_admin";
-
-        if (!targetName) {
-            userError.style.display = 'block';
-            return;
-        }
-        if (!amount || amount <= 0 || isNaN(amount)) {
-            amountError.style.display = 'block';
-            return;
-        }
-
-        const apiUrl = this.getApiUrl();
-        fetch(`${apiUrl}/api/coins/add`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                target_name: targetName,
-                amount: amount,
-                admin_name: adminName,
-                admin_password: adminPassword
-            })
-        })
-        .then(res => {
-            if (!res.ok) {
-                return res.json().then(err => {
-                    throw new Error(err.detail || 'Ошибка сервера');
-                });
-            }
-            return res.json();
-        })
-        .then(data => {
-            alert(data.message);
-            this.closeCoinsModal();
-
-            return fetch(`${this.getApiUrl()}/api/users`)
-                .then(res => res.json())
-                .then(users => {
-                    const balanceMap = new Map();
-                    users.forEach(u => balanceMap.set(u.name, u));
-
-                    allUsers = allUsers.map(user => {
-                        const updated = balanceMap.get(user.name);
-                        if (updated) {
-                            return { ...user, coins: updated.coins, exp: updated.exp, score: updated.score };
-                        }
-                        return user;
-                    });
-
-                    if (currentUser && balanceMap.has(currentUser.name)) {
-                        const fresh = balanceMap.get(currentUser.name);
-                        currentUser.coins = fresh.coins;
-                        currentUser.exp = fresh.exp;
-                        currentUser.score = fresh.score;
-                    }
-
-                    this.updateUI();
-                    this.updateSectionData('colleagues');
-                    this.updateSectionData('rating');
-                });
-        })
-        .catch(err => {
-            alert('❌ ' + err.message);
-        });
+    const targetName = searchInput.value.trim();
+    const amount = parseInt(amountInput.value);
+    
+    if (!targetName) {
+        userError.style.display = 'block';
+        return;
     }
+    if (!amount || amount <= 0 || isNaN(amount)) {
+        amountError.style.display = 'block';
+        return;
+    }
+
+    // Находим получателя
+    const targetUser = allUsers.find(u => u.name === targetName);
+    if (!targetUser) {
+        alert('❌ Пользователь не найден');
+        return;
+    }
+
+    // Начисляем коины
+    targetUser.coins += amount;
+
+    // Обновляем UI
+    this.updateUI(); // обновляет текущего пользователя (если он Наталья)
+    this.updateSectionData('colleagues');
+    this.updateSectionData('rating');
+    if (document.getElementById('profile').classList.contains('active')) {
+        this.updateSectionData('profile');
+    }
+
+    // Закрываем модалку
+    this.closeCoinsModal();
+
+    alert(`✅ ${amount} Bus‑коинов добавлено ${targetName}`);
+}
 
     loadPersonalRating() {
         const el = document.getElementById('personal-rating');
