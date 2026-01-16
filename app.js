@@ -42,7 +42,8 @@ window.fetch = function(...args) {
 // Глобальные переменные
 let currentUser = null;
 let allUsers = [];
-const NATALIA_ID = 175; // ID Натальи Сюр в Bitrix24
+let transactionHistory = [];
+const NATALIA_ID = 175;
 
 class GameLabApp {
     constructor() {}
@@ -726,6 +727,18 @@ class GameLabApp {
     // Начисляем коины
     targetUser.coins += amount;
 
+    // Добавляем в историю
+    const transaction = {
+        date: new Date().toISOString(),
+        resource: 'coins',
+        amount: amount,
+        admin: currentUser.name,
+        comment: `Начислено админом ${currentUser.name}`
+    };
+    // Сохраняем историю у получателя
+    if (!targetUser._history) targetUser._history = [];
+    targetUser._history.push(transaction);
+
     // Обновляем UI
     this.updateUI(); // обновляет текущего пользователя (если он Наталья)
     this.updateSectionData('colleagues');
@@ -804,103 +817,72 @@ class GameLabApp {
         `).join('');
     }
 
-    async loadHistory() {
-        const el = document.getElementById('history-list');
-        if (!el || !currentUser) return;
+    loadHistory() {
+    const el = document.getElementById('history-list');
+    if (!el || !currentUser) return;
 
-        try {
-            const apiUrl = this.getApiUrl();
-            const response = await fetch(`${apiUrl}/api/history/${currentUser.id}`);
-            if (!response.ok) throw new Error('Не удалось загрузить историю');
-            const history = await response.json();
+    const history = currentUser._history || [];
 
-            el.innerHTML = history.length
-                ? history.map(item => {
-                    const d = new Date(item.date);
-                    const day = d.getDate();
-                    const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-                    const month = months[d.getMonth()];
-                    const year = d.getFullYear();
-                    const formattedDate = `${day} ${month} ${year}`;
+    el.innerHTML = history.length
+        ? history.map(item => {
+            const d = new Date(item.date);
+            const day = d.getDate();
+            const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+            const month = months[d.getMonth()];
+            const year = d.getFullYear();
+            const formattedDate = `${day} ${month} ${year}`;
 
-                    let iconSrc = './img/coin.svg';
-                    let resourceLabel = 'Bus‑коин';
-                    if (item.resource === 'exp') {
-                        iconSrc = './img/exp.svg';
-                        resourceLabel = 'Опыт';
-                    } else if (item.resource === 'score') {
-                        iconSrc = './img/score.svg';
-                        resourceLabel = 'Очки';
-                    }
+            const isPositive = item.amount > 0;
+            const amountText = `${isPositive ? '+' : ''}${item.amount}`;
 
-                    const isPositive = item.amount > 0;
-                    const amountText = `${isPositive ? '+' : ''}${item.amount}`;
-
-                    return `
-                        <div class="history-item fade-in">
-                            <div style="color: #666; min-width: 100px;">${formattedDate}</div>
-                            <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
-                                <img src="${iconSrc}" alt="${resourceLabel}" style="width: 14px; height: 14px;">
-                                ${amountText}
-                            </div>
-                            <div style="min-width: 120px;">${item.admin}</div>
-                            <div style="flex-grow: 1; color: #666;">${item.comment}</div>
-                        </div>
-                    `;
-                }).join('')
-                : '<div class="loading-text">История операций пуста</div>';
-        } catch (err) {
-            console.error('Ошибка загрузки истории:', err);
-            el.innerHTML = '<div class="loading-text">Ошибка загрузки истории</div>';
-        }
-    }
+            return `
+                <div class="history-item fade-in">
+                    <div style="color: #666; min-width: 100px;">${formattedDate}</div>
+                    <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
+                        <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
+                        ${amountText}
+                    </div>
+                    <div style="min-width: 120px;">${item.admin}</div>
+                    <div style="flex-grow: 1; color: #666;">${item.comment}</div>
+                </div>
+            `;
+        }).join('')
+        : '<div class="loading-text">История операций пуста</div>';
+}
 
     async buyItem(itemId) {
-        const item = window.SHOP_ITEMS.find(i => i.id === itemId);
-        if (!item || !currentUser) {
-            alert('❌ Товар не найден или вы не авторизованы');
-            return;
-        }
-
-        if (currentUser.coins < item.price) {
-            alert('❌ Недостаточно Bus‑коинов для покупки');
-            return;
-        }
-
-        const password = prompt("Введите ваш пароль для подтверждения покупки:", "");
-        if (!password) {
-            return;
-        }
-
-        try {
-            const apiUrl = this.getApiUrl();
-            const response = await fetch(`${apiUrl}/api/coins/spend`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    target_name: currentUser.name,
-                    amount: item.price,
-                    password: password
-                })
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.detail || 'Ошибка при покупке');
-            }
-
-            currentUser.coins = result.new_balance;
-            this.updateProfile();
-            this.loadShopItems();
-            this.updateSectionData('history');
-
-            alert(`✅ Товар "${item.name}" успешно куплен!`);
-        } catch (err) {
-            console.error('Ошибка покупки:', err);
-            alert('❌ ' + err.message);
-        }
+    const item = window.SHOP_ITEMS.find(i => i.id === itemId);
+    if (!item || !currentUser) {
+        alert('❌ Товар не найден или вы не авторизованы');
+        return;
     }
+
+    if (currentUser.coins < item.price) {
+        alert('❌ Недостаточно Bus‑коинов для покупки');
+        return;
+    }
+
+    // Списываем коины
+    currentUser.coins -= item.price;
+
+    // Добавляем в историю
+    const transaction = {
+        date: new Date().toISOString(),
+        resource: 'coins',
+        amount: -item.price,
+        admin: 'Система',
+        comment: `Покупка: ${item.name}`
+    };
+    if (!currentUser._history) currentUser._history = [];
+    currentUser._history.push(transaction);
+
+    // Обновляем UI
+    this.updateProfile();
+    this.loadShopItems();
+    this.updateSectionData('history');
+
+    alert(`✅ Товар "${item.name}" успешно куплен!`);
+}
 }
 
 // Глобальные функции
