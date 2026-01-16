@@ -280,6 +280,7 @@ class GameLabApp {
             return;
         }
 
+        // Получаем из Supabase
         const { data, error } = await window.supabase
             .from('users')
             .select('*')
@@ -291,8 +292,16 @@ class GameLabApp {
             return;
         }
 
-        // Для демо принимаем любой пароль
-        currentUser = { ...data };
+        // Добавляем аватарку и должность из Bitrix24
+        const bitrixUser = allUsers.find(u => u.name === name);
+        currentUser = {
+            ...data,
+            position: bitrixUser?.position || '—',
+            avatar_url: bitrixUser?.avatar_url || null,
+            avatar_color: bitrixUser?.avatar_color || window.CONFIG.colors[0],
+            avatar_initials: bitrixUser?.avatar_initials || name.charAt(0)
+        };
+
         document.getElementById('auth-section').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         this.updateUI();
@@ -332,6 +341,7 @@ class GameLabApp {
                 div.innerHTML = `
                     <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn" onclick="app.showAddCoinsModal()">➕ Добавить Bus‑коины</button>
+                        <button class="btn" onclick="app.showDeductCoinsModal()">➖ Списать Bus‑коины</button>
                     </div>
                 `;
                 document.querySelector('.profile-info').appendChild(div);
@@ -574,6 +584,14 @@ class GameLabApp {
         document.body.style.overflow = 'hidden';
     }
 
+    showDeductCoinsModal() {
+        document.getElementById('coins-modal-title').textContent = 'Списать Bus‑коины';
+        document.getElementById('coins-modal-action-text').textContent = 'Списать';
+        this.setupCoinsUserList();
+        document.getElementById('coins-modal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
     closeCoinsModal() {
         const modal = document.getElementById('coins-modal');
         if (modal) {
@@ -606,7 +624,7 @@ class GameLabApp {
         }
 
         // Находим получателя в Supabase
-        const { data: targetData, error: fetchError } = await window.supabase
+        const {  targetData, error: fetchError } = await window.supabase
             .from('users')
             .select('id, coins')
             .eq('name', targetName)
@@ -739,8 +757,8 @@ class GameLabApp {
     }
 }
 
-// Глобальные функции
-// Делаем функции доступными из HTML
+// Делаем функции глобальными для HTML
+window.app = new GameLabApp();
 window.login = () => app.login();
 window.logout = () => app.logout();
 window.showSection = (id) => app.showSection(id);
@@ -752,7 +770,6 @@ window.submitCoinsOperation = () => app.submitCoinsOperation();
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new GameLabApp();
     app.setupEventListeners();
     app.setupModalClose();
     app.loadInitialData();
