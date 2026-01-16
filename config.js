@@ -3,13 +3,16 @@ const BITRIX_WEBHOOK_URL = "https://hdl.bitrix24.ru/rest/1673/oqdqtcqivivxv8cx/"
 const BITRIX_BASE_URL = "https://hdl.bitrix24.ru";
 
 window.CONFIG = {
+    // Supabase
+    supabaseUrl: "https://xmwzifhgjqjnoeflmevm.supabase.co",
+    supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhtd3ppZmhnanFqbm9lZmxtZXZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MTk2NTQsImV4cCI6MjA4NDA5NTY1NH0.gw2qTMtPzSBpGKc8i8QZ0MthWTvoPIsci48yeNb3tIA", // ← вставь свой ключ
     bitrixWebhook: BITRIX_WEBHOOK_URL,
     bitrixBaseUrl: BITRIX_BASE_URL,
     // apiBaseUrl: "http://127.0.0.1:8000", -локально
     apiBaseUrl: "",
-    defaultCoins: 100,
-    defaultExp: 0,
-    defaultScore: 0,
+    // defaultCoins: 100,
+    // defaultExp: 0,
+    // defaultScore: 0,
     colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8']
 };;
 
@@ -79,5 +82,10 @@ window.ACHIEVEMENTS = [
     { id: 4, name: "Суперзвезда", description: "Заработайте 1000 coins", icon: "🌟" },
     { id: 5, name: "Мастер продаж", description: "Закройте 10 сделок", icon: "💰" }
 ];
+
+
+// Инициализация Supabase
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+window.supabase = createClient(window.CONFIG.supabaseUrl, window.CONFIG.supabaseAnonKey);
 
 console.log('✅ config.js загружен');

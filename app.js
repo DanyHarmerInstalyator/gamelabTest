@@ -1,56 +1,10 @@
-// Mock: перехватываем fetch и возвращаем демо-ответы
-const originalFetch = window.fetch;
-window.fetch = function(...args) {
-    const url = args[0];
-    
-    // Если это запрос к API — подменяем ответ
-    if (url.includes('/api/')) {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                if (url.endsWith('/api/login')) {
-                    // Просто имитируем успешный вход
-                    resolve({
-                        ok: true,
-                        json: () => Promise.resolve({
-                            id: 1,
-                            name: document.getElementById('user-search')?.value || 'Демо Пользователь',
-                            coins: 500,
-                            exp: 300,
-                            score: 5,
-                            session_token: 'demo_token'
-                        })
-                    });
-                } else if (url.includes('/api/coins/add') || url.includes('/api/coins/spend')) {
-                    // Имитируем успешное начисление
-                    alert('✅ Демо: операция выполнена (данные не сохраняются)');
-                    resolve({ ok: true, json: () => Promise.resolve({ status: "success" }) });
-                } else {
-                    // Остальные запросы — возвращаем демо-данные
-                    resolve({
-                        ok: true,
-                        json: () => Promise.resolve({ users: [] })
-                    });
-                }
-            }, 300);
-        });
-    }
-    
-    // Обычные запросы (картинки, CSS) — пропускаем
-    return originalFetch.apply(this, args);
-};
-
 // Глобальные переменные
 let currentUser = null;
 let allUsers = [];
-let transactionHistory = [];
-const NATALIA_ID = 175;
+const NATALIA_NAME = "Наталья Сюр"; // Используем имя вместо ID
 
 class GameLabApp {
     constructor() {}
-
-    getApiUrl() {
-    return window.CONFIG.apiBaseUrl || '';
-}
 
     getBitrixWebhook() {
         return (window.CONFIG?.bitrixWebhook || '').trim();
@@ -67,12 +21,12 @@ class GameLabApp {
             el.style.display = 'block';
         }
     }
-        showRulesTab(tab) {
+
+    showRulesTab(tab) {
         const title = document.getElementById('rules-title');
         const content = document.getElementById('rules-content');
 
-        // Сброс стилей кнопок
-        ['coins', 'hearts', 'stars'].forEach(id => {
+        ['coins', 'hearts', 'stars', 'levels'].forEach(id => {
             const btn = document.getElementById(`tab-${id}`);
             if (btn) {
                 btn.style.backgroundColor = '';
@@ -80,7 +34,6 @@ class GameLabApp {
             }
         });
 
-        // Активная кнопка
         const activeBtn = document.getElementById(`tab-${tab}`);
         if (activeBtn) {
             activeBtn.style.backgroundColor = '#8C00AA';
@@ -91,18 +44,15 @@ class GameLabApp {
             title.textContent = '📋 ПРАВИЛА СИСТЕМЫ: КАК ЗАРАБАТЫВАТЬ Bus‑коин';
             content.innerHTML = `
                 <p>Bus‑коин — это основная валюта за выполнение рабочих задач и активность. Их можно обменивать в магазине компании.</p>
-
                 <h4>✅ Выполнение операционных задач:</h4>
                 <ul>
                     <li>Завершение срочной/важной задачи (отмеченной HR или руководителем): <strong>+15 Bus-коинов</strong></li>
                     <li>Выполнение еженедельного плана на 100%: <strong>+25 Bus‑коинов</strong></li>
                 </ul>
-
                 <h4>💼 Достижение бизнес-целей:</h4>
                 <ul>
                     <li>Предложение по оптимизации, внедренное в процесс: <strong>+20 Bus‑коинов</strong></li>
                 </ul>
-
                 <h4>👥 Командная работа и развитие:</h4>
                 <ul>
                     <li>Активное участие и вклад в рабочий проект: <strong>+10–30 Bus‑коинов</strong></li>
@@ -110,7 +60,6 @@ class GameLabApp {
                     <li>Успешное наставничество за новичком (по итогам испытательного срока): <strong>+50 Bus‑коинов</strong></li>
                     <li>Участие в корпоративном мероприятии (субботник, благотворительность): <strong>+20 Bus‑коинов</strong></li>
                 </ul>
-
                 <h4>📈 Еженедельные активности:</h4>
                 <ul>
                     <li>Идеальная посещаемость и пунктуальность за квартал: <strong>+10 Bus‑коинов</strong></li>
@@ -121,54 +70,33 @@ class GameLabApp {
             title.textContent = '🚀 УРОВНИ СИСТЕМЫ (ОПЫТ — EXP)';
             content.innerHTML = `
                 <p>Опыт начисляется независимо от валют. 1 Bus-Коин = 1 EXP. Сердечки и Звезды не дают опыта, но являются особыми достижениям</p>
-
                 <h4>🎯 1-100 EXP: Новичок (Rookie)</h4>
-                <ul>
-                    <li>Доступ: стартовый набор в магазине призов.</li>
-                </ul>
-
+                <ul><li>Доступ: стартовый набор в магазине призов.</li></ul>
                 <h4>⭐ 101-370 EXP: Активный сотрудник (Active Member)</h4>
-                <ul>
-                    <li>Привилегия: возможность участвовать в ежеквартальном розыгрыше призов.</li>
-                </ul>
-
+                <ul><li>Привилегия: возможность участвовать в ежеквартальном розыгрыше призов.</li></ul>
                 <h4>🚀 371-740 EXP: Профессионал (Professional)</h4>
-                <ul>
-                    <li>Привилегия: личный бейдж в профиле, доступ к эксклюзивным мастермайндам.</li>
-                </ul>
-
+                <ul><li>Привилегия: личный бейдж в профиле, доступ к эксклюзивным мастермайндам.</li></ul>
                 <h4>🏆 741-1825 EXP: Эксперт (Expert)</h4>
-                <ul>
-                    <li>Привилегия: роль ментора, право голоса в улучшении процессов, доступ к премиум-каталогу призов.</li>
-                </ul>
-
+                <ul><li>Привилегия: роль ментора, право голоса в улучшении процессов, доступ к премиум-каталогу призов.</li></ul>
                 <h4>👑 1826+ EXP: Легенда Aetos (Aetos Legend)</h4>
-                <ul>
-                    <li>Достижение: 1826 EXP — это 5 лет безупречной работы в компании (надбавка к окладу).
-                    Почетный статус: фото на "Аллее Славы" в офисе, право предлагать и давать имя внутренним проектам, именной бонус в день "Легенды".</li>
-                </ul>
+                <ul><li>Достижение: 1826 EXP — это 5 лет безупречной работы в компании (надбавка к окладу). Почетный статус: фото на "Аллее Славы" в офисе, право предлагать и давать имя внутренним проектам, именной бонус в день "Легенды".</li></ul>
             `;
-
         } else if (tab === 'hearts') {
             title.textContent = '❤️ КАК ПОЛУЧИТЬ СЕРДЕЧКИ (HEARTs)';
             content.innerHTML = `
                 <p>Сердечки — это валюта признания и благодарности от коллег. Их нельзя купить за Bus-коины, только подарить.</p>
-
                 <ul>
                     <li><strong>Публичная благодарность</strong> в канале #спасибо в Slack/Teams: любой сотрудник может выделить сообщество с похвалой и прикрепить до 3 сердечек.</li>
                     <li><strong>Подарок на день рождения/праздник</strong>: В день рождения каждый сотрудник автоматически получает 10 сердечек на свой счет, чтобы дарить коллегам в течение недели.</li>
                     <li><strong>Система «Спасибо»</strong>: Через специальную форму можно отправить благодарность с указанием причины. Отправка дарит 1 сердечко адресату (ограничение: 1 раз в день на человека).</li>
                     <li><strong>За помощь новичку или коллеге</strong> из другого отдела сверх обязанностей: получает +2 сердечка (по запросу руководителя).</li>
                 </ul>
-
                 <p><em>Обмен: 10 Сердечек можно конвертировать в 1 Звезду.</em></p>
-            `;    
-            
+            `;
         } else if (tab === 'stars') {
             title.textContent = '⭐ КАК ПОЛУЧАТЬ ЗВЕЗДЫ (STARs)';
             content.innerHTML = `
                 <p>Звезды — это валюта за выдающиеся достижения и экспертизу. Их присуждает руководство или комитет по геймификации.</p>
-
                 <ul>
                     <li>За победу в квартальном конкурсе (Лучший продавец, Лучшая идея месяца и т.д.): <strong>+1 Звезда</strong>.</li>
                     <li>Закрытие сделки/проекта от 10 000 000 руб.: <strong>+50 ЗВезд</strong></li>
@@ -178,23 +106,12 @@ class GameLabApp {
                     <li>За сдачу сложной профессиональной сертификации: <strong>+1 Звезда</strong>.</li>
                     <li>За активность, выходящую далеко за рамки должностных обязанностей (по итогам полугодия): <strong>+1 Звезда</strong>.</li>
                 </ul>
-
                 <p><em>Звезды можно обменять на эксклюзивные призы: дополнительный день отпуска, обучение за счет компании, VIP-обед с CEO.</em></p>
             `;
         }
     }
-    
 
     setupEventListeners() {
-        const coinsUserSearch = document.getElementById('coins-user-search');
-        if (coinsUserSearch) {
-            coinsUserSearch.addEventListener('input', (e) => {
-                const errorEl = document.getElementById('coins-user-error');
-                if (errorEl && e.target.value.trim()) {
-                    errorEl.style.display = 'none';
-                }
-            });
-        }
         const userSearch = document.getElementById('user-search');
         const colleagueSearch = document.getElementById('colleague-search');
         
@@ -236,10 +153,7 @@ class GameLabApp {
     async fetchUsersFromBitrix() {
         try {
             const webhook = this.getBitrixWebhook();
-            if (!webhook) {
-                console.warn('Bitrix webhook не задан в config.js');
-                return null;
-            }
+            if (!webhook) return null;
 
             const response = await fetch(webhook + 'user.get', {
                 method: 'POST',
@@ -248,13 +162,9 @@ class GameLabApp {
             });
 
             const data = await response.json();
-            if (data.error) {
-                console.error('Ошибка Bitrix24 API:', data.error_description || data.error);
-                return null;
-            }
-            return data.result;
+            return data.result || [];
         } catch (error) {
-            console.error('Не удалось подключиться к Bitrix24:', error);
+            console.warn('⚠️ Bitrix24 недоступен');
             return null;
         }
     }
@@ -283,101 +193,113 @@ class GameLabApp {
             id,
             name: name.trim() || 'Аноним',
             position: bxUser.WORK_POSITION || '—',
-            email: bxUser.EMAIL || '',
             avatar_url: avatarUrl,
             avatar_color: color,
-            avatar_initials: initials || '?',
-            coins: 0,
-            exp: 0,
-            score: 0
+            avatar_initials: initials || '?'
         };
     }
 
     getMockUsers() {
-        return [
-            {
-                id: 1673,
-                name: "Дмитрий Бралковский",
-                position: "Менеджер по закупкам",
-                email: "d.bralkovskiy@hdl.ru",
-                avatar_url: null,
-                avatar_color: window.CONFIG.colors[0],
-                avatar_initials: "ДБ",
-                coins: 150,
-                exp: 320,
-                score: 45
-            }
-        ];
+        return [{
+            id: 1673,
+            name: "Дмитрий Бралковский",
+            position: "Менеджер по закупкам",
+            avatar_url: null,
+            avatar_color: window.CONFIG.colors[0],
+            avatar_initials: "ДБ",
+            coins: 500,
+            exp: 300,
+            score: 10
+        }];
     }
 
     async loadInitialData() {
-    try {
-        const usersFromBitrix = await this.fetchUsersFromBitrix();
-        if (usersFromBitrix && Array.isArray(usersFromBitrix)) {
-            allUsers = usersFromBitrix.map(user => this.transformBitrixUser(user));
-            console.log('✅ Загружено пользователей из Bitrix24:', allUsers.length);
-        } else {
-            throw new Error('Bitrix вернул некорректные данные');
+        try {
+            // Получаем пользователей из Bitrix24 (для аватарок)
+            const usersFromBitrix = await this.fetchUsersFromBitrix();
+            const bitrixMap = new Map();
+            if (usersFromBitrix) {
+                usersFromBitrix.forEach(user => {
+                    bitrixMap.set(parseInt(user.ID), this.transformBitrixUser(user));
+                });
+            }
+
+            // Получаем данные из Supabase
+            const { data, error } = await window.supabase
+                .from('users')
+                .select('id, name, coins, exp, score');
+
+            if (error) throw error;
+
+            allUsers = data.map(su => {
+                const bitrix = bitrixMap.get(su.id) || {};
+                return {
+                    id: su.id,
+                    name: su.name,
+                    position: bitrix.position || '—',
+                    avatar_url: bitrix.avatar_url || null,
+                    avatar_color: bitrix.avatar_color || window.CONFIG.colors[0],
+                    avatar_initials: bitrix.avatar_initials || su.name.charAt(0),
+                    coins: su.coins,
+                    exp: su.exp,
+                    score: su.score
+                };
+            });
+
+            console.log('✅ Загружено пользователей:', allUsers.length);
+            this.setupUserAutocomplete();
+        } catch (error) {
+            console.error('❌ Ошибка загрузки данных:', error);
+            allUsers = this.getMockUsers();
+            this.setupUserAutocomplete();
         }
-    } catch (error) {
-        console.warn('⚠️ Bitrix24 недоступен. Используем демо-пользователей.');
-        allUsers = this.getMockUsers();
     }
-    this.setupUserAutocomplete();
-}
 
     setupUserAutocomplete() {
-        const usersList = document.getElementById('users-list');
-        if (!usersList) return;
-        usersList.innerHTML = '';
+        const list = document.getElementById('users-list');
+        if (!list) return;
+        list.innerHTML = '';
         allUsers.forEach(user => {
             const option = document.createElement('option');
             option.value = user.name;
-            usersList.appendChild(option);
+            list.appendChild(option);
         });
     }
 
     handleUserSearch(searchTerm) {
-        const errorElement = document.getElementById('auth-error');
-        if (errorElement && searchTerm.length > 0) {
-            errorElement.style.display = 'none';
+        const el = document.getElementById('auth-error');
+        if (el && searchTerm.length > 0) el.style.display = 'none';
+    }
+
+    async login() {
+        const name = document.getElementById('user-search')?.value.trim();
+        const password = document.getElementById('user-password')?.value.trim();
+
+        if (!name || !password) {
+            this.showError('auth-error', 'Введите имя и пароль');
+            return;
         }
+
+        const { data, error } = await window.supabase
+            .from('users')
+            .select('*')
+            .eq('name', name)
+            .single();
+
+        if (error || !data) {
+            this.showError('auth-error', 'Пользователь не найден');
+            return;
+        }
+
+        // Для демо принимаем любой пароль
+        currentUser = { ...data };
+        document.getElementById('auth-section').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        this.updateUI();
     }
-
-    login() {
-    const name = document.getElementById('user-search')?.value.trim();
-    const password = document.getElementById('user-password')?.value.trim();
-
-    if (!name || !password) {
-        this.showError('auth-error', 'Введите имя и пароль');
-        return;
-    }
-
-    const bitrixUser = allUsers.find(u => 
-        u.name.toLowerCase().includes(name.toLowerCase())
-    );
-
-    if (!bitrixUser) {
-        this.showError('auth-error', 'Пользователь не найден в Bitrix24');
-        return;
-    }
-
-    currentUser = {
-        ...bitrixUser,
-        coins: bitrixUser.coins || 10, // берём из памяти или ставим демо
-        exp: bitrixUser.exp || 300,
-        score: bitrixUser.score || 10
-    };
-
-    document.getElementById('auth-section').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    this.updateUI();
-}
 
     logout() {
         currentUser = null;
-        localStorage.removeItem('gamelab_session_token');
-        localStorage.removeItem('gamelab_user_name');
         document.getElementById('auth-section').style.display = 'block';
         document.getElementById('app').style.display = 'none';
         document.getElementById('user-search').value = '';
@@ -386,16 +308,12 @@ class GameLabApp {
 
     updateUI() {
         if (!currentUser) return;
-
-        document.getElementById('auth-section').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-
         this.updateProfile();
         this.updateSectionData('profile');
     }
 
     isNatalia() {
-        return currentUser && currentUser.id === NATALIA_ID;
+        return currentUser && currentUser.name.includes(NATALIA_NAME);
     }
 
     updateProfile() {
@@ -406,21 +324,20 @@ class GameLabApp {
         this.setElementText('profile-score', currentUser.score);
         this.updateAvatar('profile-avatar', currentUser);
 
-        const nataliaActions = document.getElementById('natalia-actions');
+        const actions = document.getElementById('natalia-actions');
         if (this.isNatalia()) {
-            if (!nataliaActions) {
-                const actionsDiv = document.createElement('div');
-                actionsDiv.id = 'natalia-actions';
-                actionsDiv.innerHTML = `
+            if (!actions) {
+                const div = document.createElement('div');
+                div.id = 'natalia-actions';
+                div.innerHTML = `
                     <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn" onclick="app.showAddCoinsModal()">➕ Добавить Bus‑коины</button>
-                        <button class="btn" onclick="app.showDeductCoinsModal()">➖ Списать Bus‑коины</button>
                     </div>
                 `;
-                document.querySelector('.profile-info').appendChild(actionsDiv);
+                document.querySelector('.profile-info').appendChild(div);
             }
-        } else if (nataliaActions) {
-            nataliaActions.remove();
+        } else if (actions) {
+            actions.remove();
         }
     }
 
@@ -446,9 +363,7 @@ class GameLabApp {
                     avatar.style.backgroundImage = `url('${user.avatar_url}')`;
                 }
             };
-            img.onerror = () => {
-                this.showAvatarInitials(avatar, user);
-            };
+            img.onerror = () => this.showAvatarInitials(avatar, user);
             img.src = user.avatar_url + '?v=' + Date.now();
         } else {
             this.showAvatarInitials(avatar, user);
@@ -462,9 +377,9 @@ class GameLabApp {
     }
 
     loadColleaguesList(searchTerm = '') {
-        const colleaguesList = document.getElementById('colleagues-list');
-        if (!colleaguesList) return;
-        colleaguesList.innerHTML = '<div class="loading-text">Загрузка...</div>';
+        const list = document.getElementById('colleagues-list');
+        if (!list) return;
+        list.innerHTML = '<div class="loading-text">Загрузка...</div>';
 
         setTimeout(() => {
             const filtered = allUsers.filter(u => 
@@ -472,7 +387,7 @@ class GameLabApp {
                 u.name.toLowerCase().includes(searchTerm.toLowerCase())
             );
             
-            colleaguesList.innerHTML = filtered.length
+            list.innerHTML = filtered.length
                 ? filtered.map(user => {
                     const hasAvatar = !!user.avatar_url;
                     return `
@@ -504,7 +419,7 @@ class GameLabApp {
                 }).join('')
                 : '<div class="loading-text">Коллеги не найдены</div>';
 
-            colleaguesList.querySelectorAll('.user-item').forEach(item => {
+            list.querySelectorAll('.user-item').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const userId = parseInt(e.currentTarget.dataset.userId);
                     const user = allUsers.find(u => u.id === userId);
@@ -557,27 +472,25 @@ class GameLabApp {
     }
 
     showSection(sectionId) {
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    
-    const sec = document.getElementById(sectionId);
-    if (sec) sec.classList.add('active');
-    if (event?.target) event.target.classList.add('active');
-    
-    // Автоматически открываем Bus‑коин при входе в Правила
-    if (sectionId === 'rules') {
-        this.showRulesTab('coins');
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        
+        const sec = document.getElementById(sectionId);
+        if (sec) sec.classList.add('active');
+        if (event?.target) event.target.classList.add('active');
+        
+        if (sectionId === 'rules') {
+            this.showRulesTab('coins');
+        }
+        
+        this.updateSectionData(sectionId);
     }
-    
-    this.updateSectionData(sectionId);
-}
 
     updateSectionData(sectionId) {
         switch(sectionId) {
             case 'colleagues': this.loadColleaguesList(); break;
             case 'shop': this.loadShopItems(); break;
             case 'rating': this.loadGlobalRating(); break;
-            case 'history': this.loadHistory(); break;
             case 'profile':
                 this.loadAchievements();
                 this.loadPersonalRating();
@@ -656,16 +569,6 @@ class GameLabApp {
     showAddCoinsModal() {
         document.getElementById('coins-modal-title').textContent = 'Добавить Bus‑коины';
         document.getElementById('coins-modal-action-text').textContent = 'Добавить';
-        this.currentOperation = 'add';
-        this.setupCoinsUserList();
-        document.getElementById('coins-modal').classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-
-    showDeductCoinsModal() {
-        document.getElementById('coins-modal-title').textContent = 'Списать Bus‑коины';
-        document.getElementById('coins-modal-action-text').textContent = 'Списать';
-        this.currentOperation = 'deduct';
         this.setupCoinsUserList();
         document.getElementById('coins-modal').classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -678,8 +581,6 @@ class GameLabApp {
             document.body.style.overflow = '';
             document.getElementById('coins-user-search').value = '';
             document.getElementById('coins-amount').value = '';
-            document.getElementById('coins-user-error').style.display = 'none';
-            document.getElementById('coins-amount-error').style.display = 'none';
         }
     }
 
@@ -687,71 +588,58 @@ class GameLabApp {
         const list = document.getElementById('coins-users-list');
         list.innerHTML = '';
         allUsers
-            .filter(u => u.id !== NATALIA_ID)
+            .filter(u => !u.name.includes(NATALIA_NAME))
             .forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.name;
-                option.dataset.userId = user.id;
                 list.appendChild(option);
             });
     }
 
-    submitCoinsOperation() {
-    const searchInput = document.getElementById('coins-user-search');
-    const amountInput = document.getElementById('coins-amount');
-    const userError = document.getElementById('coins-user-error');
-    const amountError = document.getElementById('coins-amount-error');
+    async submitCoinsOperation() {
+        const targetName = document.getElementById('coins-user-search').value.trim();
+        const amount = parseInt(document.getElementById('coins-amount').value);
+        
+        if (!targetName || isNaN(amount) || amount <= 0) {
+            alert('❌ Некорректные данные');
+            return;
+        }
 
-    userError.style.display = 'none';
-    amountError.style.display = 'none';
+        // Находим получателя в Supabase
+        const { data: targetData, error: fetchError } = await window.supabase
+            .from('users')
+            .select('id, coins')
+            .eq('name', targetName)
+            .single();
 
-    const targetName = searchInput.value.trim();
-    const amount = parseInt(amountInput.value);
-    
-    if (!targetName) {
-        userError.style.display = 'block';
-        return;
+        if (fetchError || !targetData) {
+            alert('❌ Пользователь не найден');
+            return;
+        }
+
+        // Обновляем баланс
+        const { error: updateError } = await window.supabase
+            .from('users')
+            .update({ coins: targetData.coins + amount })
+            .eq('name', targetName);
+
+        if (updateError) {
+            alert('❌ Ошибка обновления');
+            return;
+        }
+
+        // Обновляем локальные данные
+        const targetUser = allUsers.find(u => u.name === targetName);
+        if (targetUser) targetUser.coins += amount;
+
+        // Обновляем UI
+        this.updateUI();
+        this.updateSectionData('colleagues');
+        this.updateSectionData('rating');
+
+        this.closeCoinsModal();
+        alert(`✅ ${amount} Bus‑коинов добавлено ${targetName}`);
     }
-    if (!amount || amount <= 0 || isNaN(amount)) {
-        amountError.style.display = 'block';
-        return;
-    }
-
-    // Находим получателя
-    const targetUser = allUsers.find(u => u.name === targetName);
-    if (!targetUser) {
-        alert('❌ Пользователь не найден');
-        return;
-    }
-
-    // Начисляем коины
-    targetUser.coins += amount;
-
-    // Добавляем в историю
-    const transaction = {
-        date: new Date().toISOString(),
-        resource: 'coins',
-        amount: amount,
-        admin: currentUser.name,
-        comment: `Начислено админом ${currentUser.name}`
-    };
-    // Сохраняем историю у получателя
-    if (!targetUser._history) targetUser._history = [];
-    targetUser._history.push(transaction);
-
-    // Обновляем UI
-    this.updateUI(); // обновляет текущего пользователя (если он Наталья)
-    this.updateSectionData('colleagues');
-    this.updateSectionData('rating');
-    if (document.getElementById('profile').classList.contains('active')) {
-        this.updateSectionData('profile');
-    }
-
-    // Закрываем модалку
-    this.closeCoinsModal();
-
-    alert(`✅ ${amount} Bus‑коинов добавлено ${targetName}`);
-}
 
     loadPersonalRating() {
         const el = document.getElementById('personal-rating');
@@ -817,72 +705,38 @@ class GameLabApp {
         `).join('');
     }
 
-    loadHistory() {
-    const el = document.getElementById('history-list');
-    if (!el || !currentUser) return;
-
-    const history = currentUser._history || [];
-
-    el.innerHTML = history.length
-        ? history.map(item => {
-            const d = new Date(item.date);
-            const day = d.getDate();
-            const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-            const month = months[d.getMonth()];
-            const year = d.getFullYear();
-            const formattedDate = `${day} ${month} ${year}`;
-
-            const isPositive = item.amount > 0;
-            const amountText = `${isPositive ? '+' : ''}${item.amount}`;
-
-            return `
-                <div class="history-item fade-in">
-                    <div style="color: #666; min-width: 100px;">${formattedDate}</div>
-                    <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
-                        <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
-                        ${amountText}
-                    </div>
-                    <div style="min-width: 120px;">${item.admin}</div>
-                    <div style="flex-grow: 1; color: #666;">${item.comment}</div>
-                </div>
-            `;
-        }).join('')
-        : '<div class="loading-text">История операций пуста</div>';
-}
-
     async buyItem(itemId) {
-    const item = window.SHOP_ITEMS.find(i => i.id === itemId);
-    if (!item || !currentUser) {
-        alert('❌ Товар не найден или вы не авторизованы');
-        return;
+        const item = window.SHOP_ITEMS.find(i => i.id === itemId);
+        if (!item || !currentUser) {
+            alert('❌ Товар не найден');
+            return;
+        }
+
+        if (currentUser.coins < item.price) {
+            alert('❌ Недостаточно Bus‑коинов');
+            return;
+        }
+
+        // Списываем коины в Supabase
+        const { error } = await window.supabase
+            .from('users')
+            .update({ coins: currentUser.coins - item.price })
+            .eq('id', currentUser.id);
+
+        if (error) {
+            alert('❌ Ошибка покупки');
+            return;
+        }
+
+        // Обновляем локальные данные
+        currentUser.coins -= item.price;
+
+        // Обновляем UI
+        this.updateProfile();
+        this.loadShopItems();
+
+        alert(`✅ Товар "${item.name}" успешно куплен!`);
     }
-
-    if (currentUser.coins < item.price) {
-        alert('❌ Недостаточно Bus‑коинов для покупки');
-        return;
-    }
-
-    // Списываем коины
-    currentUser.coins -= item.price;
-
-    // Добавляем в историю
-    const transaction = {
-        date: new Date().toISOString(),
-        resource: 'coins',
-        amount: -item.price,
-        admin: 'Система',
-        comment: `Покупка: ${item.name}`
-    };
-    if (!currentUser._history) currentUser._history = [];
-    currentUser._history.push(transaction);
-
-    // Обновляем UI
-    this.updateProfile();
-    this.loadShopItems();
-    this.updateSectionData('history');
-
-    alert(`✅ Товар "${item.name}" успешно куплен!`);
-}
 }
 
 // Глобальные функции
@@ -895,49 +749,10 @@ function closeItemModal() { app.closeItemModal(); }
 function closeCoinsModal() { app.closeCoinsModal(); }
 function submitCoinsOperation() { app.submitCoinsOperation(); }
 
-// Инициализация после загрузки DOM
+// Инициализация
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new GameLabApp();
     app.setupEventListeners();
     app.setupModalClose();
-
-    app.loadInitialData().then(() => {
-        const token = localStorage.getItem('gamelab_session_token');
-        const userName = localStorage.getItem('gamelab_user_name');
-        
-        if (token && userName) {
-            fetch(`${app.getApiUrl()}/api/session/validate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token })
-            })
-            .then(res => {
-                if (res.ok) return res.json();
-                else throw new Error();
-            })
-            .then(userData => {
-                const bitrixUser = allUsers.find(u => u.name === userData.name);
-                currentUser = {
-                    id: userData.id,
-                    name: userData.name,
-                    position: bitrixUser?.position || '—',
-                    avatar_url: bitrixUser?.avatar_url,
-                    avatar_color: bitrixUser?.avatar_color,
-                    avatar_initials: bitrixUser?.avatar_initials || userData.name.split(' ').map(n => n[0]).join('').toUpperCase(),
-                    coins: userData.coins,
-                    exp: userData.exp,
-                    score: userData.score
-                };
-                document.getElementById('auth-section').style.display = 'none';
-                document.getElementById('app').style.display = 'block';
-                app.updateUI();
-            })
-            .catch(() => {
-                localStorage.removeItem('gamelab_session_token');
-                localStorage.removeItem('gamelab_user_name');
-                document.getElementById('auth-section').style.display = 'block';
-                document.getElementById('app').style.display = 'none';
-            });
-        }
-    });
+    app.loadInitialData();
 });
