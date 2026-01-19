@@ -280,29 +280,16 @@ class GameLabApp {
             return;
         }
 
-        // Получаем актуальный баланс
-const { data: userData, error: fetchError } = await window.supabase
-    .from('users')
-    .select('coins')
-    .eq('id', targetId)
-    .single();
+        const { data, error } = await window.supabase
+            .from('users')
+            .select('*')
+            .eq('name', name)
+            .single();
 
-if (fetchError || !userData) {
-    console.error('Пользователь не найден:', fetchError || 'Нет данных');
-    alert('❌ Пользователь не найден в базе');
-    return;
-}
-
-let newCoins;
-if (this.currentOperation === 'add') {
-    newCoins = userData.coins + amount;
-} else if (this.currentOperation === 'deduct') {
-    newCoins = userData.coins - amount;
-    if (newCoins < 0) {
-        alert('❌ Недостаточно коинов');
-        return;
-    }
-}
+        if (error || !data) {
+            this.showError('auth-error', 'Пользователь не найден');
+            return;
+        }
 
         const fullUser = allUsers.find(u => u.name === name);
         currentUser = {
@@ -633,11 +620,6 @@ if (this.currentOperation === 'add') {
                 option.value = user.name;
                 list.appendChild(option);
             });
-
-        // Обновляем выбор при вводе
-        searchInput.addEventListener('input', () => {
-            // Ничего не делаем — используем точное совпадение в submit
-        });
     }
 
     async submitCoinsOperation() {
@@ -651,7 +633,6 @@ if (this.currentOperation === 'add') {
             return;
         }
 
-        // Точное совпадение по имени
         const targetUser = allUsers.find(u => u.name === targetName);
         if (!targetUser) {
             alert('❌ Пользователь не найден. Выберите из списка.');
@@ -660,15 +641,14 @@ if (this.currentOperation === 'add') {
 
         const targetId = targetUser.id;
 
-        // Получаем актуальный баланс
         const {  userData, error: fetchError } = await window.supabase
             .from('users')
             .select('coins')
             .eq('id', targetId)
             .single();
 
-        if (fetchError) {
-            alert('❌ Ошибка подключения к базе');
+        if (fetchError || !userData) {
+            alert('❌ Пользователь не найден в базе');
             return;
         }
 
@@ -683,7 +663,6 @@ if (this.currentOperation === 'add') {
             }
         }
 
-        // Обновляем баланс
         const { error: updateError } = await window.supabase
             .from('users')
             .update({ coins: newCoins })
@@ -694,7 +673,6 @@ if (this.currentOperation === 'add') {
             return;
         }
 
-        // Сохраняем транзакцию
         await window.supabase
             .from('transactions')
             .insert({
@@ -706,13 +684,11 @@ if (this.currentOperation === 'add') {
                 comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
             });
 
-        // Обновляем локальные данные
         targetUser.coins = newCoins;
         if (currentUser && currentUser.id === targetId) {
             currentUser.coins = newCoins;
         }
 
-        // Обновляем UI
         this.updateUI();
         this.loadColleaguesList();
         this.loadGlobalRating();
@@ -823,7 +799,6 @@ if (this.currentOperation === 'add') {
             }
         }
 
-        // Защита от undefined
         if (!Array.isArray(history)) history = [];
 
         el.innerHTML = history.length
