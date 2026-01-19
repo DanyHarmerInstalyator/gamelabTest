@@ -598,123 +598,119 @@ class GameLabApp {
         if (modal) {
             modal.classList.remove('active');
             document.body.style.overflow = '';
-            document.getElementById('coins-user-search').value = '';
-            document.getElementById('coins-amount').value = '';
-            document.getElementById('coins-target-id').value = ''; // ← сброс ID
+
+            // Безопасная очистка полей
+            const userSearch = document.getElementById('coins-user-search');
+            const amountInput = document.getElementById('coins-amount');
+            if (userSearch) userSearch.value = '';
+            if (amountInput) amountInput.value = '';
         }
     }
 
     setupCoinsUserList() {
         const list = document.getElementById('coins-users-list');
         const searchInput = document.getElementById('coins-user-search');
-        const hiddenId = document.getElementById('coins-target-id');
+        if (!list || !searchInput) return;
+
         list.innerHTML = '';
         allUsers
             .filter(u => !u.name.includes(NATALIA_NAME))
             .forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.name;
-                option.dataset.id = user.id;
                 list.appendChild(option);
             });
 
-        // Обновляем скрытое поле при вводе
+        // Обновляем выбор при вводе
         searchInput.addEventListener('input', () => {
-            const selected = Array.from(list.options).find(opt => opt.value === searchInput.value);
-            if (selected) {
-                hiddenId.value = selected.dataset.id;
-            } else {
-                hiddenId.value = '';
-            }
+            // Ничего не делаем — используем точное совпадение в submit
         });
     }
 
     async submitCoinsOperation() {
-    const searchInput = document.getElementById('coins-user-search');
-    const amountInput = document.getElementById('coins-amount');
-    const targetName = searchInput.value.trim();
-    const amount = parseInt(amountInput.value);
+        const searchInput = document.getElementById('coins-user-search');
+        const amountInput = document.getElementById('coins-amount');
+        const targetName = searchInput?.value.trim();
+        const amount = parseInt(amountInput?.value);
 
-    if (!targetName || isNaN(amount) || amount <= 0) {
-        alert('❌ Выберите пользователя и введите сумму');
-        return;
-    }
-
-    // Находим пользователя ПО ИМЕНИ (точное совпадение)
-    const targetUser = allUsers.find(u => u.name === targetName);
-    if (!targetUser) {
-        alert('❌ Пользователь не найден. Выберите из списка.');
-        return;
-    }
-
-    const targetId = targetUser.id;
-
-    // Получаем текущие данные из Supabase
-    const { data: userData, error: fetchError } = await window.supabase
-        .from('users')
-        .select('coins')
-        .eq('id', targetId)
-        .single();
-
-    if (fetchError) {
-        console.error('Ошибка загрузки:', fetchError);
-        alert('❌ Ошибка подключения к базе');
-        return;
-    }
-
-    let newCoins;
-    if (this.currentOperation === 'add') {
-        newCoins = userData.coins + amount;
-    } else if (this.currentOperation === 'deduct') {
-        newCoins = userData.coins - amount;
-        if (newCoins < 0) {
-            alert('❌ Недостаточно коинов');
+        if (!targetName || isNaN(amount) || amount <= 0) {
+            alert('❌ Выберите пользователя и введите сумму');
             return;
         }
+
+        // Точное совпадение по имени
+        const targetUser = allUsers.find(u => u.name === targetName);
+        if (!targetUser) {
+            alert('❌ Пользователь не найден. Выберите из списка.');
+            return;
+        }
+
+        const targetId = targetUser.id;
+
+        // Получаем актуальный баланс
+        const {  userData, error: fetchError } = await window.supabase
+            .from('users')
+            .select('coins')
+            .eq('id', targetId)
+            .single();
+
+        if (fetchError) {
+            alert('❌ Ошибка подключения к базе');
+            return;
+        }
+
+        let newCoins;
+        if (this.currentOperation === 'add') {
+            newCoins = userData.coins + amount;
+        } else if (this.currentOperation === 'deduct') {
+            newCoins = userData.coins - amount;
+            if (newCoins < 0) {
+                alert('❌ Недостаточно коинов');
+                return;
+            }
+        }
+
+        // Обновляем баланс
+        const { error: updateError } = await window.supabase
+            .from('users')
+            .update({ coins: newCoins })
+            .eq('id', targetId);
+
+        if (updateError) {
+            alert('❌ Не удалось обновить баланс');
+            return;
+        }
+
+        // Сохраняем транзакцию
+        await window.supabase
+            .from('transactions')
+            .insert({
+                user_id: targetId,
+                admin_id: currentUser.id,
+                action: this.currentOperation,
+                amount: amount,
+                resource: 'coins',
+                comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
+            });
+
+        // Обновляем локальные данные
+        targetUser.coins = newCoins;
+        if (currentUser && currentUser.id === targetId) {
+            currentUser.coins = newCoins;
+        }
+
+        // Обновляем UI
+        this.updateUI();
+        this.loadColleaguesList();
+        this.loadGlobalRating();
+        if (document.getElementById('history')?.classList.contains('active')) {
+            this.loadHistory();
+        }
+
+        this.closeCoinsModal();
+        const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
+        alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
     }
-
-    // Обновляем баланс
-    const { error: updateError } = await window.supabase
-        .from('users')
-        .update({ coins: newCoins })
-        .eq('id', targetId);
-
-    if (updateError) {
-        console.error('Ошибка обновления:', updateError);
-        alert('❌ Не удалось обновить баланс');
-        return;
-    }
-
-    // Сохраняем транзакцию
-    await window.supabase
-        .from('transactions')
-        .insert({
-            user_id: targetId,
-            admin_id: currentUser.id,
-            action: this.currentOperation,
-            amount: amount,
-            resource: 'coins',
-            comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
-        });
-
-    // Обновляем локальные данные
-    targetUser.coins = newCoins;
-    if (currentUser && currentUser.id === targetId) {
-        currentUser.coins = newCoins;
-    }
-
-    // Обновляем UI
-    this.updateUI();
-    this.loadColleaguesList();
-    this.loadGlobalRating();
-    if (document.getElementById('history')?.classList.contains('active')) {
-        this.loadHistory();
-    }
-
-    this.closeCoinsModal();
-    const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
-    alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
-}
 
     loadPersonalRating() {
         const el = document.getElementById('personal-rating');
@@ -794,13 +790,7 @@ class GameLabApp {
                 .order('timestamp', { ascending: false })
                 .limit(50);
 
-            if (error) {
-                console.error('Ошибка загрузки истории:', error);
-                el.innerHTML = '<div class="loading-text">Ошибка загрузки</div>';
-                return;
-            }
-
-            if (data.length > 0) {
+            if (!error && data) {
                 const userIds = [...new Set(data.map(t => t.user_id))];
                 const {  usersData } = await window.supabase
                     .from('users')
@@ -819,6 +809,9 @@ class GameLabApp {
                 }));
             }
         }
+
+        // Защита от undefined
+        if (!Array.isArray(history)) history = [];
 
         el.innerHTML = history.length
             ? history.map(item => {
