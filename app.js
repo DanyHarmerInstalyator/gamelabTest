@@ -280,16 +280,29 @@ class GameLabApp {
             return;
         }
 
-        const { data, error } = await window.supabase
-            .from('users')
-            .select('*')
-            .eq('name', name)
-            .single();
+        // Получаем актуальный баланс
+const { data: userData, error: fetchError } = await window.supabase
+    .from('users')
+    .select('coins')
+    .eq('id', targetId)
+    .single();
 
-        if (error || !data) {
-            this.showError('auth-error', 'Пользователь не найден');
-            return;
-        }
+if (fetchError || !userData) {
+    console.error('Пользователь не найден:', fetchError || 'Нет данных');
+    alert('❌ Пользователь не найден в базе');
+    return;
+}
+
+let newCoins;
+if (this.currentOperation === 'add') {
+    newCoins = userData.coins + amount;
+} else if (this.currentOperation === 'deduct') {
+    newCoins = userData.coins - amount;
+    if (newCoins < 0) {
+        alert('❌ Недостаточно коинов');
+        return;
+    }
+}
 
         const fullUser = allUsers.find(u => u.name === name);
         currentUser = {
