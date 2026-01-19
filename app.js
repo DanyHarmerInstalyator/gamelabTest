@@ -600,11 +600,14 @@ class GameLabApp {
             document.body.style.overflow = '';
             document.getElementById('coins-user-search').value = '';
             document.getElementById('coins-amount').value = '';
+            document.getElementById('coins-target-id').value = ''; // ← сброс ID
         }
     }
 
     setupCoinsUserList() {
         const list = document.getElementById('coins-users-list');
+        const searchInput = document.getElementById('coins-user-search');
+        const hiddenId = document.getElementById('coins-target-id');
         list.innerHTML = '';
         allUsers
             .filter(u => !u.name.includes(NATALIA_NAME))
@@ -614,36 +617,30 @@ class GameLabApp {
                 option.dataset.id = user.id;
                 list.appendChild(option);
             });
+
+        // Обновляем скрытое поле при вводе
+        searchInput.addEventListener('input', () => {
+            const selected = Array.from(list.options).find(opt => opt.value === searchInput.value);
+            if (selected) {
+                hiddenId.value = selected.dataset.id;
+            } else {
+                hiddenId.value = '';
+            }
+        });
     }
 
     async submitCoinsOperation() {
-        const searchInput = document.getElementById('coins-user-search');
-        const amount = parseInt(document.getElementById('coins-amount').value);
+        const amountInput = document.getElementById('coins-amount');
+        const targetIdInput = document.getElementById('coins-target-id');
+        const amount = parseInt(amountInput.value);
+        const targetIdStr = targetIdInput.value;
 
-        if (!searchInput.value.trim() || isNaN(amount) || amount <= 0) {
-            alert('❌ Некорректные данные');
+        if (!targetIdStr || isNaN(amount) || amount <= 0) {
+            alert('❌ Выберите пользователя и введите сумму');
             return;
         }
 
-        // Получаем ID из datalist
-        let targetId = null;
-        const selectedOption = Array.from(document.getElementById('coins-users-list').options)
-            .find(opt => opt.value === searchInput.value.trim());
-        
-        if (selectedOption) {
-            targetId = selectedOption.dataset.id;
-        } else {
-            const found = allUsers.find(u => u.name === searchInput.value.trim());
-            targetId = found?.id;
-        }
-
-        if (!targetId) {
-            alert('❌ Пользователь не найден. Выберите из списка.');
-            return;
-        }
-
-        // Приводим к числу
-        targetId = parseInt(targetId);
+        const targetId = parseInt(targetIdStr);
 
         // Получаем текущие данные
         const {  targetData, error: fetchError } = await window.supabase
@@ -657,7 +654,6 @@ class GameLabApp {
             return;
         }
 
-        // Рассчитываем новый баланс
         let newCoins;
         if (this.currentOperation === 'add') {
             newCoins = targetData.coins + amount;
@@ -669,7 +665,7 @@ class GameLabApp {
             }
         }
 
-        // Обновляем в Supabase
+        // Обновляем баланс
         const { error: updateError } = await window.supabase
             .from('users')
             .update({ coins: newCoins })
@@ -696,18 +692,15 @@ class GameLabApp {
             console.warn('⚠️ Не удалось сохранить транзакцию:', txError);
         }
 
-        // === КРИТИЧЕСКИ ВАЖНО: обновляем локальные данные ===
-        const targetUser = allUsers.find(u => u.id == targetId); // используем ==
-        if (targetUser) {
-            targetUser.coins = newCoins;
-        }
+        // Обновляем локальные данные
+        const targetUser = allUsers.find(u => u.id == targetId);
+        if (targetUser) targetUser.coins = newCoins;
 
-        // Если текущий пользователь — получатель
         if (currentUser && currentUser.id == targetId) {
             currentUser.coins = newCoins;
         }
 
-        // Принудительно обновляем UI
+        // Обновляем UI
         this.updateUI();
         this.loadColleaguesList();
         this.loadGlobalRating();
