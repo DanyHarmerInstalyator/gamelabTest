@@ -625,6 +625,7 @@ class GameLabApp {
             return;
         }
 
+        // Получаем ID из datalist
         let targetId = null;
         const selectedOption = Array.from(document.getElementById('coins-users-list').options)
             .find(opt => opt.value === searchInput.value.trim());
@@ -641,6 +642,10 @@ class GameLabApp {
             return;
         }
 
+        // Приводим к числу
+        targetId = parseInt(targetId);
+
+        // Получаем текущие данные
         const {  targetData, error: fetchError } = await window.supabase
             .from('users')
             .select('id, name, coins')
@@ -652,6 +657,7 @@ class GameLabApp {
             return;
         }
 
+        // Рассчитываем новый баланс
         let newCoins;
         if (this.currentOperation === 'add') {
             newCoins = targetData.coins + amount;
@@ -663,6 +669,7 @@ class GameLabApp {
             }
         }
 
+        // Обновляем в Supabase
         const { error: updateError } = await window.supabase
             .from('users')
             .update({ coins: newCoins })
@@ -689,15 +696,26 @@ class GameLabApp {
             console.warn('⚠️ Не удалось сохранить транзакцию:', txError);
         }
 
-        const targetUser = allUsers.find(u => u.id == targetId);
-        if (targetUser) targetUser.coins = newCoins;
+        // === КРИТИЧЕСКИ ВАЖНО: обновляем локальные данные ===
+        const targetUser = allUsers.find(u => u.id == targetId); // используем ==
+        if (targetUser) {
+            targetUser.coins = newCoins;
+        }
 
+        // Если текущий пользователь — получатель
+        if (currentUser && currentUser.id == targetId) {
+            currentUser.coins = newCoins;
+        }
+
+        // Принудительно обновляем UI
         this.updateUI();
-        this.updateSectionData('colleagues');
-        this.updateSectionData('rating');
+        this.loadColleaguesList();
+        this.loadGlobalRating();
+        if (document.getElementById('history').classList.contains('active')) {
+            this.loadHistory();
+        }
 
         this.closeCoinsModal();
-
         const actionText = this.currentOperation === 'add' ? 'добавлено' : 'списано';
         alert(`✅ ${amount} Bus‑коинов ${actionText} ${targetData.name}`);
     }
