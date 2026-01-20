@@ -519,7 +519,7 @@ class GameLabApp {
                     <img src="./img/coin.svg" alt="Coins" style="width: 16px; height: 16px; margin-right: 5px;">
                     ${item.price} Bus‑коин
                 </div>
-                <button class="btn" onclick="app.buyItem(${item.id})" 
+                <button class="btn" onclick="app.buyItem(${item.id})"
                         ${currentUser?.coins >= item.price ? '' : 'disabled'}>
                     Купить
                 </button>
@@ -599,7 +599,6 @@ class GameLabApp {
             modal.classList.remove('active');
             document.body.style.overflow = '';
 
-            // Безопасная очистка полей
             const userSearch = document.getElementById('coins-user-search');
             const amountInput = document.getElementById('coins-amount');
             if (userSearch) userSearch.value = '';
@@ -641,6 +640,7 @@ class GameLabApp {
 
         const targetId = targetUser.id;
 
+        // Получаем актуальный баланс
         const {  userData, error: fetchError } = await window.supabase
             .from('users')
             .select('coins')
@@ -663,6 +663,7 @@ class GameLabApp {
             }
         }
 
+        // Обновляем баланс
         const { error: updateError } = await window.supabase
             .from('users')
             .update({ coins: newCoins })
@@ -673,6 +674,7 @@ class GameLabApp {
             return;
         }
 
+        // Сохраняем транзакцию
         await window.supabase
             .from('transactions')
             .insert({
@@ -684,11 +686,13 @@ class GameLabApp {
                 comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
             });
 
+        // Обновляем локальные данные
         targetUser.coins = newCoins;
         if (currentUser && currentUser.id === targetId) {
             currentUser.coins = newCoins;
         }
 
+        // Обновляем UI
         this.updateUI();
         this.loadColleaguesList();
         this.loadGlobalRating();
@@ -748,7 +752,7 @@ class GameLabApp {
                     <div style="font-weight: bold; color: #ff9800; min-width: 30px; text-align: center;">
                         ${i + 1}
                     </div>
-                    <div class="avatar ${user.avatar_url ? '' : 'initials'}" 
+                    <div class="avatar ${user.avatar_url ? '' : 'initials'}"
                          style="width: 40px; height: 40px; margin-right: 12px; ${user.avatar_url ? `background-image: url('${user.avatar_url}?v=${Date.now()}')` : `background-color: ${user.avatar_color}`}">
                         ${user.avatar_url ? '' : user.avatar_initials}
                     </div>
@@ -779,12 +783,20 @@ class GameLabApp {
                 .order('timestamp', { ascending: false })
                 .limit(50);
 
-            if (!error && data) {
+            if (!error && data && data.length > 0) {
                 const userIds = [...new Set(data.map(t => t.user_id))];
-                const {  usersData } = await window.supabase
-                    .from('users')
-                    .select('id, name')
-                    .in('id', userIds);
+                
+                let usersData = [];
+                if (userIds.length > 0) {
+                    const userResponse = await window.supabase
+                        .from('users')
+                        .select('id, name')
+                        .in('id', userIds);
+                    
+                    if (!userResponse.error && userResponse.data) {
+                        usersData = userResponse.data;
+                    }
+                }
 
                 const userMap = new Map(usersData.map(u => [u.id, u.name]));
 
@@ -798,8 +810,6 @@ class GameLabApp {
                 }));
             }
         }
-
-        if (!Array.isArray(history)) history = [];
 
         el.innerHTML = history.length
             ? history.map(item => {
