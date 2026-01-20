@@ -621,9 +621,15 @@ class GameLabApp {
             });
     }
 
-    async submitCoinsOperation() {
+   async submitCoinsOperation() {
     const searchInput = document.getElementById('coins-user-search');
     const amountInput = document.getElementById('coins-amount');
+
+    if (!searchInput || !amountInput) {
+        alert('❌ Модальное окно не загружено');
+        return;
+    }
+
     const targetName = searchInput.value.trim();
     const amount = parseInt(amountInput.value);
 
@@ -632,7 +638,6 @@ class GameLabApp {
         return;
     }
 
-    // Находим пользователя ПО ИМЕНИ (точное совпадение)
     const targetUser = allUsers.find(u => u.name === targetName);
     if (!targetUser) {
         alert('❌ Пользователь не найден. Выберите из списка.');
@@ -641,24 +646,28 @@ class GameLabApp {
 
     const targetId = targetUser.id;
 
-    // Получаем текущие данные из Supabase
-    const {  userData, error: fetchError } = await window.supabase
+    // Запрос к Supabase
+    const { data: userData, error: fetchError } = await window.supabase
         .from('users')
         .select('coins')
         .eq('id', targetId)
         .single();
 
-    if (fetchError) {
-        console.error('Ошибка загрузки:', fetchError);
-        alert('❌ Ошибка подключения к базе');
+    // КРИТИЧЕСКАЯ ПРОВЕРКА
+    if (fetchError || !userData) {
+        console.error('Пользователь не найден в Supabase:', { targetId, targetName, error: fetchError });
+        alert('❌ Пользователь не найден в базе данных. Убедитесь, что он добавлен в таблицу `users`.');
         return;
     }
 
+    // coins — int4 → число!
+    const currentCoins = userData.coins; // уже число
     let newCoins;
+
     if (this.currentOperation === 'add') {
-        newCoins = userData.coins + amount;
+        newCoins = currentCoins + amount;
     } else if (this.currentOperation === 'deduct') {
-        newCoins = userData.coins - amount;
+        newCoins = currentCoins - amount;
         if (newCoins < 0) {
             alert('❌ Недостаточно коинов');
             return;
@@ -677,14 +686,14 @@ class GameLabApp {
         return;
     }
 
-    // Сохраняем транзакцию
+    // Сохраняем транзакцию (amount — должно быть числом, но у тебя text → преобразуем)
     await window.supabase
         .from('transactions')
         .insert({
             user_id: targetId,
             admin_id: currentUser.id,
             action: this.currentOperation,
-            amount: amount,
+            amount: amount.toString(), // потому что у тебя amount — text
             resource: 'coins',
             comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
         });
