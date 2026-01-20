@@ -113,6 +113,28 @@ class GameLabApp {
         }
     }
 
+    switchHistory(type) {
+    const operationsBtn = document.getElementById('history-operations-btn');
+    const purchasesBtn = document.getElementById('history-purchases-btn');
+
+    if (type === 'operations') {
+        operationsBtn.style.backgroundColor = '#8C00AA';
+        operationsBtn.style.color = 'white';
+        purchasesBtn.style.backgroundColor = '';
+        purchasesBtn.style.color = '';
+    } else {
+        purchasesBtn.style.backgroundColor = '#8C00AA';
+        purchasesBtn.style.color = 'white';
+        operationsBtn.style.backgroundColor = '';
+        operationsBtn.style.color = '';
+    }
+
+    // Сохраняем выбор
+    document.getElementById('history-switch').dataset.type = type;
+    this.loadHistory();
+}
+
+
     setupEventListeners() {
         const userSearch = document.getElementById('user-search');
         const colleagueSearch = document.getElementById('colleague-search');
@@ -686,14 +708,14 @@ class GameLabApp {
         return;
     }
 
-    // Сохраняем транзакцию (amount — должно быть числом, но у тебя text → преобразуем)
+    // Сохраняем транзакцию 
     await window.supabase
         .from('transactions')
         .insert({
             user_id: targetId,
             admin_id: currentUser.id,
             action: this.currentOperation,
-            amount: amount.toString(), // потому что у тебя amount — text
+            amount: amount, 
             resource: 'coins',
             comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
         });
@@ -782,102 +804,127 @@ class GameLabApp {
     }
 
     async loadHistory() {
-        const el = document.getElementById('history-list');
-        if (!el || !currentUser) return;
+    const el = document.getElementById('history-list');
+    if (!el || !currentUser) return;
 
-        let history = [];
-
-        if (this.isNatalia()) {
-            const { data, error } = await window.supabase
-                .from('transactions')
-                .select('user_id, action, amount, resource, comment, timestamp')
-                .eq('admin_id', currentUser.id)
-                .order('timestamp', { ascending: false })
-                .limit(50);
-
-            if (!error && data && data.length > 0) {
-                const userIds = [...new Set(data.map(t => t.user_id))];
-                
-                let usersData = [];
-                if (userIds.length > 0) {
-                    const userResponse = await window.supabase
-                        .from('users')
-                        .select('id, name')
-                        .in('id', userIds);
-                    
-                    if (!userResponse.error && userResponse.data) {
-                        usersData = userResponse.data;
-                    }
-                }
-
-                const userMap = new Map(usersData.map(u => [u.id, u.name]));
-
-                history = data.map(item => ({
-                    date: item.timestamp,
-                    resource: item.resource,
-                    amount: item.action === 'add' ? item.amount : -item.amount,
-                    admin: 'Вы',
-                    comment: item.comment || `Операция: ${item.action}`,
-                    target: userMap.get(item.user_id) || 'Неизвестный'
-                }));
-            }
-        }
-
-        el.innerHTML = history.length
-            ? history.map(item => {
-                const d = new Date(item.date);
-                const day = d.getDate();
-                const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-                const month = months[d.getMonth()];
-                const year = d.getFullYear();
-                const formattedDate = `${day} ${month} ${year}`;
-
-                const isPositive = item.amount > 0;
-                const amountText = `${isPositive ? '+' : ''}${item.amount}`;
-
-                return `
-                    <div class="history-item fade-in">
-                        <div style="color: #666; min-width: 100px;">${formattedDate}</div>
-                        <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
-                            <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
-                            ${amountText}
-                        </div>
-                        <div style="min-width: 120px;">${item.target}</div>
-                        <div style="flex-grow: 1; color: #666;">${item.comment}</div>
-                    </div>
-                `;
-            }).join('')
-            : '<div class="loading-text">История операций пуста</div>';
+    // Создаём переключатель
+    let historyType = 'operations'; // по умолчанию
+    const switchBtn = document.getElementById('history-switch');
+    if (switchBtn) {
+        historyType = switchBtn.dataset.type || 'operations';
     }
+
+    let history = [];
+
+    if (historyType === 'operations') {
+        // Только операции: add/deduct
+        const { data, error } = await window.supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .in('action', ['add', 'deduct'])
+            .order('timestamp', { ascending: false })
+            .limit(50);
+
+        if (!error && data) {
+            history = data.map(item => ({
+                date: item.timestamp,
+                resource: item.resource,
+                amount: item.action === 'add' ? item.amount : -item.amount,
+                admin: item.admin_id ? 'Админ' : 'Система',
+                comment: item.comment || `Операция: ${item.action}`,
+                type: 'operation'
+            }));
+        }
+    } else if (historyType === 'purchases') {
+        // Только покупки
+        const { data, error } = await window.supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .eq('action', 'buy')
+            .order('timestamp', { ascending: false })
+            .limit(50);
+
+        if (!error && data) {
+            history = data.map(item => ({
+                date: item.timestamp,
+                resource: 'item',
+                amount: -item.amount,
+                admin: 'Магазин',
+                comment: item.comment || `Покупка`,
+                type: 'purchase'
+            }));
+        }
+    }
+
+    el.innerHTML = history.length
+        ? history.map(item => {
+            const d = new Date(item.date);
+            const day = d.getDate();
+            const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+            const month = months[d.getMonth()];
+            const year = d.getFullYear();
+            const formattedDate = `${day} ${month} ${year}`;
+
+            const isPositive = item.amount > 0;
+            const amountText = `${isPositive ? '+' : ''}${item.amount}`;
+
+            return `
+                <div class="history-item fade-in">
+                    <div style="color: #666; min-width: 100px;">${formattedDate}</div>
+                    <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
+                        <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
+                        ${amountText}
+                    </div>
+                    <div style="min-width: 120px;">${item.admin}</div>
+                    <div style="flex-grow: 1; color: #666;">${item.comment}</div>
+                </div>
+            `;
+        }).join('')
+        : '<div class="loading-text">История пуста</div>';
+}
 
     async buyItem(itemId) {
-        const item = window.SHOP_ITEMS.find(i => i.id === itemId);
-        if (!item || !currentUser) {
-            alert('❌ Товар не найден');
-            return;
-        }
-
-        if (currentUser.coins < item.price) {
-            alert('❌ Недостаточно Bus‑коинов');
-            return;
-        }
-
-        const { error } = await window.supabase
-            .from('users')
-            .update({ coins: currentUser.coins - item.price })
-            .eq('id', currentUser.id);
-
-        if (error) {
-            alert('❌ Ошибка покупки');
-            return;
-        }
-
-        currentUser.coins -= item.price;
-        this.updateProfile();
-        this.loadShopItems();
-
-        alert(`✅ Товар "${item.name}" успешно куплен!`);
+    const item = window.SHOP_ITEMS.find(i => i.id === itemId);
+    if (!item || !currentUser) {
+        alert('❌ Товар не найден');
+        return;
     }
+
+    if (currentUser.coins < item.price) {
+        alert('❌ Недостаточно Bus‑коинов');
+        return;
+    }
+
+    const { error } = await window.supabase
+        .from('users')
+        .update({ coins: currentUser.coins - item.price })
+        .eq('id', currentUser.id);
+
+    if (error) {
+        alert('❌ Ошибка покупки');
+        return;
+    }
+
+    // Сохраняем ПОКУПКУ в историю
+    await window.supabase
+        .from('transactions')
+        .insert({
+            user_id: currentUser.id,
+            admin_id: null, // покупка — не от админа
+            action: 'buy',
+            amount: item.price,
+            resource: 'item',
+            comment: `Покупка: ${item.name}`
+        });
+
+    currentUser.coins -= item.price;
+    this.updateProfile();
+    this.loadShopItems();
+
+    alert(`✅ Товар "${item.name}" успешно куплен!`);
+}
 }
 
 // Глобальные функции

@@ -148,16 +148,15 @@
             </div>
 
             <!-- История -->
-            <div id="history" class="section">
-                <div class="card">
-                    <h3>📝 История операций</h3>
-                    <div class="history-list" id="history-list">
-                        <div class="loading-text">Загрузка истории...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <div class="section-header">
+    <h2>История</h2>
+    <div style="margin-top: 10px;">
+        <button id="history-operations-btn" class="btn" onclick="app.switchHistory('operations')">📝 Операции</button>
+        <button id="history-purchases-btn" class="btn" onclick="app.switchHistory('purchases')">🛒 Покупки</button>
+        <span id="history-switch" data-type="operations" style="display:none;"></span>
     </div>
+</div>
+<div id="history-list"></div>
 
     <!-- Модальные окна -->
     <div id="user-modal" class="modal">
