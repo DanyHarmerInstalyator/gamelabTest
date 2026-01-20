@@ -72,7 +72,13 @@
                         <div class="stat-item">
                             <div class="stat-value" id="profile-score">0</div>
                             <div class="stat-label">
-                                <img src="./img/score .svg" alt="Score" class="stat-icon"> Очки
+                                <img src="./img/star.svg" alt="Stars" class="stat-icon"> Звёзды
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value hearts-color" id="profile-hearts">0</div>
+                            <div class="stat-label">
+                                <img src="./img/heart.svg" alt="Hearts" class="stat-icon"> Сердечки
                             </div>
                         </div>
                     </div>
@@ -119,7 +125,6 @@
             <!-- Правила -->
             <div id="rules" class="section">
                 <div class="card">
-                    <!-- Кнопки переключения -->
                     <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
                         <button class="btn" onclick="app.showRulesTab('coins')" id="tab-coins">📋 Bus‑коин</button>
                         <button class="btn" onclick="app.showRulesTab('hearts')" id="tab-hearts">❤️ HEARTs</button>
@@ -127,10 +132,7 @@
                         <button class="btn" onclick="app.showRulesTab('levels')" id="tab-levels">🚀 Уровни</button>
                     </div>
 
-                    <!-- Заголовок (динамический) -->
                     <h3 id="rules-title">📋 ПРАВИЛА СИСТЕМЫ: КАК ЗАРАБАТЫВАТЬ Bus‑коин</h3>
-
-                    <!-- 🔥 ИСПРАВЛЕНО: добавлен id="rules-content" -->
                     <div id="rules-content" class="rules-content">
                         <!-- Контент будет заменён JavaScript -->
                     </div>
@@ -148,15 +150,23 @@
             </div>
 
             <!-- История -->
-            <div class="section-header">
-    <h2>История</h2>
-    <div style="margin-top: 10px;">
-        <button id="history-operations-btn" class="btn" onclick="app.switchHistory('operations')">📝 Операции</button>
-        <button id="history-purchases-btn" class="btn" onclick="app.switchHistory('purchases')">🛒 Покупки</button>
-        <span id="history-switch" data-type="operations" style="display:none;"></span>
+            <div id="history" class="section">
+                <div class="card">
+                    <div class="section-header">
+                        <h2>История</h2>
+                        <div style="margin-top: 10px;">
+                            <button id="history-operations-btn" class="btn" onclick="app.switchHistory('operations')">📝 Операции</button>
+                            <button id="history-purchases-btn" class="btn" onclick="app.switchHistory('purchases')">🛒 Покупки</button>
+                            <span id="history-switch" data-type="operations" style="display:none;"></span>
+                        </div>
+                    </div>
+                    <div id="history-list">
+                        <div class="loading-text">Загрузка истории...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-<div id="history-list"></div>
 
     <!-- Модальные окна -->
     <div id="user-modal" class="modal">
@@ -175,27 +185,28 @@
                         <img src="./img/coin.svg" alt="Coins" class="stat-icon">
                         <span id="modal-coins">0</span>
                     </div>
-                    <div class="stat-label">
-                        <img src="./img/coin.svg" alt="Coins" class="stat-icon"> Bus‑коин
-                    </div>
+                    <div class="stat-label">Bus‑коин</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-value exp-color">
                         <img src="./img/exp.svg" alt="Experience" class="stat-icon">
                         <span id="modal-exp">0</span>
                     </div>
-                    <div class="stat-label">
-                        <img src="./img/exp.svg" alt="Experience" class="stat-icon"> Опыт
-                    </div>
+                    <div class="stat-label">Опыт</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-value score-color">
-                        <img src="./img/score .svg" alt="Score" class="stat-icon">
+                        <img src="./img/star.svg" alt="Stars" class="stat-icon">
                         <span id="modal-score">0</span>
                     </div>
-                    <div class="stat-label">
-                        <img src="./img/score .svg" alt="Score" class="stat-icon"> Очки
+                    <div class="stat-label">Звёзды</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value hearts-color">
+                        <img src="./img/heart.svg" alt="Hearts" class="stat-icon">
+                        <span id="modal-hearts">0</span>
                     </div>
+                    <div class="stat-label">Сердечки</div>
                 </div>
             </div>
             <div class="card">
@@ -229,7 +240,7 @@
 
     <div id="coins-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn" onclick="submitCoinsOperation()">&times;</span>
+            <span class="close-btn" onclick="closeCoinsModal()">&times;</span>
             <h3 id="coins-modal-title">Добавить коины</h3>
             
             <div style="margin: 20px 0;">
@@ -245,9 +256,20 @@
                 <div id="coins-amount-error" style="color: red; margin-top: 5px; display: none;">Введите корректное число</div>
             </div>
 
-            <button class="btn" style="width: 100%;" onclick="app.submitCoinsOperation()">
+            <button class="btn" style="width: 100%;" onclick="submitCoinsOperation()">
                 <span id="coins-modal-action-text">Добавить</span>
             </button>
+        </div>
+    </div>
+
+    <!-- Модалка: Подарить сердечко -->
+    <div id="heart-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="app.closeHeartModal()">&times;</span>
+            <h3>❤️ Подарить сердечко</h3>
+            <p>Напишите, за что вы дарите сердечко:</p>
+            <textarea id="heart-comment" placeholder="Спасибо за помощь!" rows="3" style="width: 100%; margin: 10px 0;"></textarea>
+            <button class="btn" onclick="app.submitHeart()">Отправить</button>
         </div>
     </div>
 

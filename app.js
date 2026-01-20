@@ -113,28 +113,6 @@ class GameLabApp {
         }
     }
 
-    switchHistory(type) {
-    const operationsBtn = document.getElementById('history-operations-btn');
-    const purchasesBtn = document.getElementById('history-purchases-btn');
-
-    if (type === 'operations') {
-        operationsBtn.style.backgroundColor = '#8C00AA';
-        operationsBtn.style.color = 'white';
-        purchasesBtn.style.backgroundColor = '';
-        purchasesBtn.style.color = '';
-    } else {
-        purchasesBtn.style.backgroundColor = '#8C00AA';
-        purchasesBtn.style.color = 'white';
-        operationsBtn.style.backgroundColor = '';
-        operationsBtn.style.color = '';
-    }
-
-    // Сохраняем выбор
-    document.getElementById('history-switch').dataset.type = type;
-    this.loadHistory();
-}
-
-
     setupEventListeners() {
         const userSearch = document.getElementById('user-search');
         const colleagueSearch = document.getElementById('colleague-search');
@@ -159,7 +137,8 @@ class GameLabApp {
         const modals = [
             { id: 'user-modal', closeFn: () => this.closeUserModal() },
             { id: 'item-modal', closeFn: () => this.closeItemModal() },
-            { id: 'coins-modal', closeFn: () => this.closeCoinsModal() }
+            { id: 'coins-modal', closeFn: () => this.closeCoinsModal() },
+            { id: 'heart-modal', closeFn: () => this.closeHeartModal() }
         ];
 
         modals.forEach(({ id, closeFn }) => {
@@ -233,7 +212,8 @@ class GameLabApp {
             avatar_initials: "ДБ",
             coins: 500,
             exp: 300,
-            score: 10
+            score: 10,
+            hearts: 0
         }];
     }
 
@@ -264,7 +244,8 @@ class GameLabApp {
                     avatar_initials: bitrix.avatar_initials || su.name.charAt(0),
                     coins: su.coins,
                     exp: su.exp,
-                    score: su.score
+                    score: su.score,
+                    hearts: 0 // временно
                 };
             });
 
@@ -319,7 +300,8 @@ class GameLabApp {
             position: fullUser?.position || '—',
             avatar_url: fullUser?.avatar_url || null,
             avatar_color: fullUser?.avatar_color || window.CONFIG.colors[0],
-            avatar_initials: fullUser?.avatar_initials || name.charAt(0)
+            avatar_initials: fullUser?.avatar_initials || name.charAt(0),
+            hearts: fullUser?.hearts || 0
         };
 
         document.getElementById('auth-section').style.display = 'none';
@@ -351,9 +333,13 @@ class GameLabApp {
         this.setElementText('profile-coins', currentUser.coins);
         this.setElementText('profile-exp', currentUser.exp);
         this.setElementText('profile-score', currentUser.score);
+        this.setElementText('profile-hearts', currentUser.hearts || 0);
         this.updateAvatar('profile-avatar', currentUser);
 
         const actions = document.getElementById('natalia-actions');
+        const heartBtn = document.getElementById('give-heart-btn');
+
+        // Кнопки Натальи
         if (this.isNatalia()) {
             if (!actions) {
                 const div = document.createElement('div');
@@ -366,8 +352,17 @@ class GameLabApp {
                 `;
                 document.querySelector('.profile-info').appendChild(div);
             }
-        } else if (actions) {
-            actions.remove();
+            if (heartBtn) heartBtn.remove();
+        } else {
+            if (actions) actions.remove();
+            if (!heartBtn) {
+                const btn = document.createElement('button');
+                btn.id = 'give-heart-btn';
+                btn.className = 'btn';
+                btn.textContent = '❤️ Подарить сердечко';
+                btn.onclick = () => this.showGiveHeartModal();
+                document.querySelector('.profile-info').appendChild(btn);
+            }
         }
     }
 
@@ -441,7 +436,11 @@ class GameLabApp {
                                 </div>
                                 <div class="user-stat">
                                     <div class="user-stat-value score-color">${user.score}</div>
-                                    <div class="user-stat-label">Очки</div>
+                                    <div class="user-stat-label">Звёзды</div>
+                                </div>
+                                <div class="user-stat">
+                                    <div class="user-stat-value hearts-color">${user.hearts || 0}</div>
+                                    <div class="user-stat-label">Сердечки</div>
                                 </div>
                             </div>
                         </div>
@@ -465,6 +464,7 @@ class GameLabApp {
         this.setElementText('modal-coins', user.coins);
         this.setElementText('modal-exp', user.exp);
         this.setElementText('modal-score', user.score);
+        this.setElementText('modal-hearts', user.hearts || 0);
         this.updateAvatar('modal-avatar', user);
         this.loadUserAchievements(user);
         document.getElementById('user-modal').classList.add('active');
@@ -525,6 +525,7 @@ class GameLabApp {
             case 'profile':
                 this.loadAchievements();
                 this.loadPersonalRating();
+                // ❌ НЕ вызываем loadHistory() здесь
                 break;
         }
     }
@@ -628,6 +629,17 @@ class GameLabApp {
         }
     }
 
+    showGiveHeartModal() {
+        document.getElementById('heart-modal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeHeartModal() {
+        document.getElementById('heart-modal').classList.remove('active');
+        document.body.style.overflow = '';
+        document.getElementById('heart-comment').value = '';
+    }
+
     setupCoinsUserList() {
         const list = document.getElementById('coins-users-list');
         const searchInput = document.getElementById('coins-user-search');
@@ -643,101 +655,121 @@ class GameLabApp {
             });
     }
 
-   async submitCoinsOperation() {
-    const searchInput = document.getElementById('coins-user-search');
-    const amountInput = document.getElementById('coins-amount');
+    async submitCoinsOperation() {
+        const searchInput = document.getElementById('coins-user-search');
+        const amountInput = document.getElementById('coins-amount');
 
-    if (!searchInput || !amountInput) {
-        alert('❌ Модальное окно не загружено');
-        return;
-    }
-
-    const targetName = searchInput.value.trim();
-    const amount = parseInt(amountInput.value);
-
-    if (!targetName || isNaN(amount) || amount <= 0) {
-        alert('❌ Выберите пользователя и введите сумму');
-        return;
-    }
-
-    const targetUser = allUsers.find(u => u.name === targetName);
-    if (!targetUser) {
-        alert('❌ Пользователь не найден. Выберите из списка.');
-        return;
-    }
-
-    const targetId = targetUser.id;
-
-    // Запрос к Supabase
-    const { data: userData, error: fetchError } = await window.supabase
-        .from('users')
-        .select('coins')
-        .eq('id', targetId)
-        .single();
-
-    // КРИТИЧЕСКАЯ ПРОВЕРКА
-    if (fetchError || !userData) {
-        console.error('Пользователь не найден в Supabase:', { targetId, targetName, error: fetchError });
-        alert('❌ Пользователь не найден в базе данных. Убедитесь, что он добавлен в таблицу `users`.');
-        return;
-    }
-
-    // coins — int4 → число!
-    const currentCoins = userData.coins; // уже число
-    let newCoins;
-
-    if (this.currentOperation === 'add') {
-        newCoins = currentCoins + amount;
-    } else if (this.currentOperation === 'deduct') {
-        newCoins = currentCoins - amount;
-        if (newCoins < 0) {
-            alert('❌ Недостаточно коинов');
+        if (!searchInput || !amountInput) {
+            alert('❌ Модальное окно не загружено');
             return;
         }
+
+        const targetName = searchInput.value.trim();
+        const amount = parseInt(amountInput.value);
+
+        if (!targetName || isNaN(amount) || amount <= 0) {
+            alert('❌ Выберите пользователя и введите сумму');
+            return;
+        }
+
+        const targetUser = allUsers.find(u => u.name === targetName);
+        if (!targetUser) {
+            alert('❌ Пользователь не найден. Выберите из списка.');
+            return;
+        }
+
+        const targetId = targetUser.id;
+
+        const {  userData, error: fetchError } = await window.supabase
+            .from('users')
+            .select('coins')
+            .eq('id', targetId)
+            .single();
+
+        if (fetchError || !userData) {
+            alert('❌ Пользователь не найден в базе');
+            return;
+        }
+
+        let newCoins;
+        if (this.currentOperation === 'add') {
+            newCoins = userData.coins + amount;
+        } else if (this.currentOperation === 'deduct') {
+            newCoins = userData.coins - amount;
+            if (newCoins < 0) {
+                alert('❌ Недостаточно коинов');
+                return;
+            }
+        }
+
+        const { error: updateError } = await window.supabase
+            .from('users')
+            .update({ coins: newCoins })
+            .eq('id', targetId);
+
+        if (updateError) {
+            alert('❌ Не удалось обновить баланс');
+            return;
+        }
+
+        // Сохраняем транзакцию
+        await window.supabase
+            .from('transactions')
+            .insert({
+                user_id: targetId,
+                admin_id: currentUser.id,
+                action: this.currentOperation,
+                amount: amount, // int4
+                resource: 'coins',
+                comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
+            });
+
+        // Обновляем локальные данные
+        targetUser.coins = newCoins;
+        if (currentUser && currentUser.id === targetId) {
+            currentUser.coins = newCoins;
+        }
+
+        this.updateUI();
+        this.loadColleaguesList();
+        this.loadGlobalRating();
+
+        this.closeCoinsModal();
+        const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
+        alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
     }
 
-    // Обновляем баланс
-    const { error: updateError } = await window.supabase
-        .from('users')
-        .update({ coins: newCoins })
-        .eq('id', targetId);
+    async submitHeart() {
+        const comment = document.getElementById('heart-comment').value.trim();
+        if (!comment) {
+            alert('❌ Напишите комментарий');
+            return;
+        }
 
-    if (updateError) {
-        console.error('Ошибка обновления:', updateError);
-        alert('❌ Не удалось обновить баланс');
-        return;
+        // Сохраняем в transactions
+        await window.supabase
+            .from('transactions')
+            .insert({
+                user_id: currentUser.id,
+                admin_id: null,
+                action: 'give_heart',
+                amount: 1,
+                resource: 'hearts',
+                comment: comment
+            });
+
+        // Обновляем локально
+        currentUser.hearts = (currentUser.hearts || 0) + 1;
+        this.updateProfile();
+
+        // Обновляем историю, если открыта
+        if (document.getElementById('history')?.classList.contains('active')) {
+            this.loadHistory();
+        }
+
+        this.closeHeartModal();
+        alert('✅ Сердечко отправлено!');
     }
-
-    // Сохраняем транзакцию 
-    await window.supabase
-        .from('transactions')
-        .insert({
-            user_id: targetId,
-            admin_id: currentUser.id,
-            action: this.currentOperation,
-            amount: amount, 
-            resource: 'coins',
-            comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
-        });
-
-    // Обновляем локальные данные
-    targetUser.coins = newCoins;
-    if (currentUser && currentUser.id === targetId) {
-        currentUser.coins = newCoins;
-    }
-
-    // Обновляем UI
-    this.updateUI();
-    this.loadColleaguesList();
-    this.loadGlobalRating();
-    if (document.getElementById('history')?.classList.contains('active')) {
-        this.loadHistory();
-    }
-
-    this.closeCoinsModal();
-    const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
-    alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
-}
 
     loadPersonalRating() {
         const el = document.getElementById('personal-rating');
@@ -766,6 +798,20 @@ class GameLabApp {
                             Опыт:
                         </span>
                         <span class="balance-value exp-color">${currentUser.exp}</span>
+                    </div>
+                    <div class="balance-item">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <img src="./img/star.svg" alt="Stars" style="width: 20px; height: 20px;">
+                            Звёзды:
+                        </span>
+                        <span class="balance-value score-color">${currentUser.score}</span>
+                    </div>
+                    <div class="balance-item">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <img src="./img/heart.svg" alt="Hearts" style="width: 20px; height: 20px;">
+                            Сердечки:
+                        </span>
+                        <span class="balance-value hearts-color">${currentUser.hearts || 0}</span>
                     </div>
                 </div>
             </div>
@@ -804,127 +850,142 @@ class GameLabApp {
     }
 
     async loadHistory() {
-    const el = document.getElementById('history-list');
-    if (!el || !currentUser) return;
+        const el = document.getElementById('history-list');
+        if (!el || !currentUser) return;
 
-    // Создаём переключатель
-    let historyType = 'operations'; // по умолчанию
-    const switchBtn = document.getElementById('history-switch');
-    if (switchBtn) {
-        historyType = switchBtn.dataset.type || 'operations';
-    }
+        const switchType = document.getElementById('history-switch')?.dataset.type || 'operations';
+        let history = [];
 
-    let history = [];
+        if (switchType === 'operations') {
+            const { data, error } = await window.supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .in('action', ['add', 'deduct'])
+                .order('timestamp', { ascending: false })
+                .limit(50);
 
-    if (historyType === 'operations') {
-        // Только операции: add/deduct
-        const { data, error } = await window.supabase
-            .from('transactions')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .in('action', ['add', 'deduct'])
-            .order('timestamp', { ascending: false })
-            .limit(50);
+            if (!error && data) {
+                history = data.map(item => ({
+                    date: item.timestamp,
+                    resource: item.resource,
+                    amount: item.action === 'add' ? item.amount : -item.amount,
+                    admin: item.admin_id ? 'Админ' : 'Система',
+                    comment: item.comment || `Операция: ${item.action}`,
+                    type: 'operation'
+                }));
+            }
+        } else if (switchType === 'purchases') {
+            const { data, error } = await window.supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .eq('action', 'buy')
+                .order('timestamp', { ascending: false })
+                .limit(50);
 
-        if (!error && data) {
-            history = data.map(item => ({
-                date: item.timestamp,
-                resource: item.resource,
-                amount: item.action === 'add' ? item.amount : -item.amount,
-                admin: item.admin_id ? 'Админ' : 'Система',
-                comment: item.comment || `Операция: ${item.action}`,
-                type: 'operation'
-            }));
+            if (!error && data) {
+                history = data.map(item => ({
+                    date: item.timestamp,
+                    resource: 'item',
+                    amount: -item.amount,
+                    admin: 'Магазин',
+                    comment: item.comment || 'Покупка',
+                    type: 'purchase'
+                }));
+            }
         }
-    } else if (historyType === 'purchases') {
-        // Только покупки
-        const { data, error } = await window.supabase
-            .from('transactions')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .eq('action', 'buy')
-            .order('timestamp', { ascending: false })
-            .limit(50);
 
-        if (!error && data) {
-            history = data.map(item => ({
-                date: item.timestamp,
-                resource: 'item',
-                amount: -item.amount,
-                admin: 'Магазин',
-                comment: item.comment || `Покупка`,
-                type: 'purchase'
-            }));
-        }
-    }
+        el.innerHTML = history.length
+            ? history.map(item => {
+                const d = new Date(item.date);
+                const day = d.getDate();
+                const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+                const month = months[d.getMonth()];
+                const year = d.getFullYear();
+                const formattedDate = `${day} ${month} ${year}`;
 
-    el.innerHTML = history.length
-        ? history.map(item => {
-            const d = new Date(item.date);
-            const day = d.getDate();
-            const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-            const month = months[d.getMonth()];
-            const year = d.getFullYear();
-            const formattedDate = `${day} ${month} ${year}`;
+                const isPositive = item.amount > 0;
+                const amountText = `${isPositive ? '+' : ''}${item.amount}`;
 
-            const isPositive = item.amount > 0;
-            const amountText = `${isPositive ? '+' : ''}${item.amount}`;
+                let iconSrc = './img/coin.svg';
+                if (item.resource === 'hearts') iconSrc = './img/heart.svg';
 
-            return `
-                <div class="history-item fade-in">
-                    <div style="color: #666; min-width: 100px;">${formattedDate}</div>
-                    <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
-                        <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
-                        ${amountText}
+                return `
+                    <div class="history-item fade-in">
+                        <div style="color: #666; min-width: 100px;">${formattedDate}</div>
+                        <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
+                            <img src="${iconSrc}" alt="Resource" style="width: 14px; height: 14px;">
+                            ${amountText}
+                        </div>
+                        <div style="min-width: 120px;">${item.admin}</div>
+                        <div style="flex-grow: 1; color: #666;">${item.comment}</div>
                     </div>
-                    <div style="min-width: 120px;">${item.admin}</div>
-                    <div style="flex-grow: 1; color: #666;">${item.comment}</div>
-                </div>
-            `;
-        }).join('')
-        : '<div class="loading-text">История пуста</div>';
-}
+                `;
+            }).join('')
+            : '<div class="loading-text">История пуста</div>';
+    }
 
     async buyItem(itemId) {
-    const item = window.SHOP_ITEMS.find(i => i.id === itemId);
-    if (!item || !currentUser) {
-        alert('❌ Товар не найден');
-        return;
+        const item = window.SHOP_ITEMS.find(i => i.id === itemId);
+        if (!item || !currentUser) {
+            alert('❌ Товар не найден');
+            return;
+        }
+
+        if (currentUser.coins < item.price) {
+            alert('❌ Недостаточно Bus‑коинов');
+            return;
+        }
+
+        const { error } = await window.supabase
+            .from('users')
+            .update({ coins: currentUser.coins - item.price })
+            .eq('id', currentUser.id);
+
+        if (error) {
+            alert('❌ Ошибка покупки');
+            return;
+        }
+
+        // Сохраняем покупку
+        await window.supabase
+            .from('transactions')
+            .insert({
+                user_id: currentUser.id,
+                admin_id: null,
+                action: 'buy',
+                amount: item.price,
+                resource: 'item',
+                comment: `Покупка: ${item.name}`
+            });
+
+        currentUser.coins -= item.price;
+        this.updateProfile();
+        this.loadShopItems();
+
+        alert(`✅ Товар "${item.name}" успешно куплен!`);
     }
 
-    if (currentUser.coins < item.price) {
-        alert('❌ Недостаточно Bus‑коинов');
-        return;
+    switchHistory(type) {
+        const operationsBtn = document.getElementById('history-operations-btn');
+        const purchasesBtn = document.getElementById('history-purchases-btn');
+
+        if (type === 'operations') {
+            operationsBtn.style.backgroundColor = '#8C00AA';
+            operationsBtn.style.color = 'white';
+            purchasesBtn.style.backgroundColor = '';
+            purchasesBtn.style.color = '';
+        } else {
+            purchasesBtn.style.backgroundColor = '#8C00AA';
+            purchasesBtn.style.color = 'white';
+            operationsBtn.style.backgroundColor = '';
+            operationsBtn.style.color = '';
+        }
+
+        document.getElementById('history-switch').dataset.type = type;
+        this.loadHistory();
     }
-
-    const { error } = await window.supabase
-        .from('users')
-        .update({ coins: currentUser.coins - item.price })
-        .eq('id', currentUser.id);
-
-    if (error) {
-        alert('❌ Ошибка покупки');
-        return;
-    }
-
-    // Сохраняем ПОКУПКУ в историю
-    await window.supabase
-        .from('transactions')
-        .insert({
-            user_id: currentUser.id,
-            admin_id: null, // покупка — не от админа
-            action: 'buy',
-            amount: item.price,
-            resource: 'item',
-            comment: `Покупка: ${item.name}`
-        });
-
-    currentUser.coins -= item.price;
-    this.updateProfile();
-    this.loadShopItems();
-
-    alert(`✅ Товар "${item.name}" успешно куплен!`);
-}
 }
 
 // Глобальные функции
@@ -937,6 +998,7 @@ window.closeUserModal = () => app.closeUserModal();
 window.closeItemModal = () => app.closeItemModal();
 window.closeCoinsModal = () => app.closeCoinsModal();
 window.submitCoinsOperation = () => app.submitCoinsOperation();
+window.closeHeartModal = () => app.closeHeartModal();
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
