@@ -624,12 +624,6 @@ class GameLabApp {
     async submitCoinsOperation() {
     const searchInput = document.getElementById('coins-user-search');
     const amountInput = document.getElementById('coins-amount');
-
-    if (!searchInput || !amountInput) {
-        alert('❌ Модальное окно не загружено');
-        return;
-    }
-
     const targetName = searchInput.value.trim();
     const amount = parseInt(amountInput.value);
 
@@ -638,6 +632,7 @@ class GameLabApp {
         return;
     }
 
+    // Находим пользователя ПО ИМЕНИ (точное совпадение)
     const targetUser = allUsers.find(u => u.name === targetName);
     if (!targetUser) {
         alert('❌ Пользователь не найден. Выберите из списка.');
@@ -646,34 +641,34 @@ class GameLabApp {
 
     const targetId = targetUser.id;
 
+    // Получаем текущие данные из Supabase
     const {  userData, error: fetchError } = await window.supabase
         .from('users')
         .select('coins')
         .eq('id', targetId)
         .single();
 
-    if (fetchError || !userData) {
-        alert('❌ Пользователь не найден в базе');
+    if (fetchError) {
+        console.error('Ошибка загрузки:', fetchError);
+        alert('❌ Ошибка подключения к базе');
         return;
     }
 
-    // coins хранится как TEXT → преобразуем в число
-    const currentCoins = parseInt(userData.coins) || 0;
-
     let newCoins;
     if (this.currentOperation === 'add') {
-        newCoins = currentCoins + amount;
+        newCoins = userData.coins + amount;
     } else if (this.currentOperation === 'deduct') {
-        newCoins = currentCoins - amount;
+        newCoins = userData.coins - amount;
         if (newCoins < 0) {
             alert('❌ Недостаточно коинов');
             return;
         }
     }
 
+    // Обновляем баланс
     const { error: updateError } = await window.supabase
         .from('users')
-        .update({ coins: newCoins }) // теперь число
+        .update({ coins: newCoins })
         .eq('id', targetId);
 
     if (updateError) {
@@ -700,6 +695,7 @@ class GameLabApp {
         currentUser.coins = newCoins;
     }
 
+    // Обновляем UI
     this.updateUI();
     this.loadColleaguesList();
     this.loadGlobalRating();
