@@ -622,88 +622,95 @@ class GameLabApp {
     }
 
     async submitCoinsOperation() {
-        const searchInput = document.getElementById('coins-user-search');
-        const amountInput = document.getElementById('coins-amount');
-        const targetName = searchInput?.value.trim();
-        const amount = parseInt(amountInput?.value);
+    const searchInput = document.getElementById('coins-user-search');
+    const amountInput = document.getElementById('coins-amount');
 
-        if (!targetName || isNaN(amount) || amount <= 0) {
-            alert('❌ Выберите пользователя и введите сумму');
-            return;
-        }
-
-        const targetUser = allUsers.find(u => u.name === targetName);
-        if (!targetUser) {
-            alert('❌ Пользователь не найден. Выберите из списка.');
-            return;
-        }
-
-        const targetId = targetUser.id;
-
-        // Получаем актуальный баланс
-        const {  userData, error: fetchError } = await window.supabase
-            .from('users')
-            .select('coins')
-            .eq('id', targetId)
-            .single();
-
-        if (fetchError || !userData) {
-            alert('❌ Пользователь не найден в базе');
-            return;
-        }
-
-        let newCoins;
-        if (this.currentOperation === 'add') {
-            newCoins = userData.coins + amount;
-        } else if (this.currentOperation === 'deduct') {
-            newCoins = userData.coins - amount;
-            if (newCoins < 0) {
-                alert('❌ Недостаточно коинов');
-                return;
-            }
-        }
-
-        // Обновляем баланс
-        const { error: updateError } = await window.supabase
-            .from('users')
-            .update({ coins: newCoins })
-            .eq('id', targetId);
-
-        if (updateError) {
-            alert('❌ Не удалось обновить баланс');
-            return;
-        }
-
-        // Сохраняем транзакцию
-        await window.supabase
-            .from('transactions')
-            .insert({
-                user_id: targetId,
-                admin_id: currentUser.id,
-                action: this.currentOperation,
-                amount: amount,
-                resource: 'coins',
-                comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
-            });
-
-        // Обновляем локальные данные
-        targetUser.coins = newCoins;
-        if (currentUser && currentUser.id === targetId) {
-            currentUser.coins = newCoins;
-        }
-
-        // Обновляем UI
-        this.updateUI();
-        this.loadColleaguesList();
-        this.loadGlobalRating();
-        if (document.getElementById('history')?.classList.contains('active')) {
-            this.loadHistory();
-        }
-
-        this.closeCoinsModal();
-        const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
-        alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
+    if (!searchInput || !amountInput) {
+        alert('❌ Модальное окно не загружено');
+        return;
     }
+
+    const targetName = searchInput.value.trim();
+    const amount = parseInt(amountInput.value);
+
+    if (!targetName || isNaN(amount) || amount <= 0) {
+        alert('❌ Выберите пользователя и введите сумму');
+        return;
+    }
+
+    const targetUser = allUsers.find(u => u.name === targetName);
+    if (!targetUser) {
+        alert('❌ Пользователь не найден. Выберите из списка.');
+        return;
+    }
+
+    const targetId = targetUser.id;
+
+    const {  userData, error: fetchError } = await window.supabase
+        .from('users')
+        .select('coins')
+        .eq('id', targetId)
+        .single();
+
+    if (fetchError || !userData) {
+        alert('❌ Пользователь не найден в базе');
+        return;
+    }
+
+    // coins хранится как TEXT → преобразуем в число
+    const currentCoins = parseInt(userData.coins) || 0;
+
+    let newCoins;
+    if (this.currentOperation === 'add') {
+        newCoins = currentCoins + amount;
+    } else if (this.currentOperation === 'deduct') {
+        newCoins = currentCoins - amount;
+        if (newCoins < 0) {
+            alert('❌ Недостаточно коинов');
+            return;
+        }
+    }
+
+    const { error: updateError } = await window.supabase
+        .from('users')
+        .update({ coins: newCoins }) // теперь число
+        .eq('id', targetId);
+
+    if (updateError) {
+        console.error('Ошибка обновления:', updateError);
+        alert('❌ Не удалось обновить баланс');
+        return;
+    }
+
+    // Сохраняем транзакцию
+    await window.supabase
+        .from('transactions')
+        .insert({
+            user_id: targetId,
+            admin_id: currentUser.id,
+            action: this.currentOperation,
+            amount: amount,
+            resource: 'coins',
+            comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
+        });
+
+    // Обновляем локальные данные
+    targetUser.coins = newCoins;
+    if (currentUser && currentUser.id === targetId) {
+        currentUser.coins = newCoins;
+    }
+
+    this.updateUI();
+    this.loadColleaguesList();
+    this.loadGlobalRating();
+    if (document.getElementById('history')?.classList.contains('active')) {
+        this.loadHistory();
+    }
+
+    this.closeCoinsModal();
+    const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
+    alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
+}
 
     loadPersonalRating() {
         const el = document.getElementById('personal-rating');
