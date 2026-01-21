@@ -170,7 +170,116 @@ class GameLabApp {
             return null;
         }
     }
+showGiveHeartModal() {
+    this.setupHeartRecipientList();
+    document.getElementById('heart-modal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
 
+closeHeartModal() {
+    document.getElementById('heart-modal').classList.remove('active');
+    document.body.style.overflow = '';
+    document.getElementById('heart-comment').value = '';
+    document.getElementById('heart-amount').value = '1';
+}
+
+setupHeartRecipientList() {
+    const list = document.getElementById('heart-recipients-list');
+    if (!list) return;
+    list.innerHTML = '';
+    allUsers
+        .filter(u => u.id !== currentUser.id)
+        .forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.name;
+            option.dataset.id = user.id;
+            list.appendChild(option);
+        });
+}
+
+async submitHeart() {
+    const searchInput = document.getElementById('heart-recipient-search');
+    const amountInput = document.getElementById('heart-amount');
+    const commentInput = document.getElementById('heart-comment');
+
+    const recipientName = searchInput?.value.trim();
+    const amount = parseInt(amountInput?.value);
+    const comment = commentInput?.value.trim();
+
+    if (!recipientName) {
+        document.getElementById('heart-recipient-error').style.display = 'block';
+        return;
+    }
+    if (isNaN(amount) || amount < 1 || amount > 10) {
+        alert('❌ Введите количество от 1 до 10');
+        return;
+    }
+    if (!comment) {
+        alert('❌ Напишите комментарий');
+        return;
+    }
+
+    // Находим ID получателя
+    let recipientId = null;
+    const options = document.querySelectorAll('#heart-recipients-list option');
+    for (const opt of options) {
+        if (opt.value === recipientName) {
+            recipientId = parseInt(opt.dataset.id);
+            break;
+        }
+    }
+
+    if (!recipientId) {
+        alert('❌ Пользователь не найден. Выберите из списка.');
+        return;
+    }
+
+    // Получаем текущие данные получателя
+    const {  userData, error: fetchError } = await window.supabase
+        .from('users')
+        .select('hearts')
+        .eq('id', recipientId)
+        .single();
+
+    if (fetchError || !userData) {
+        alert('❌ Получатель не найден в базе');
+        return;
+    }
+
+    const newHearts = (userData.hearts || 0) + amount;
+
+    // Обновляем баланс
+    const { error: updateError } = await window.supabase
+        .from('users')
+        .update({ hearts: newHearts })
+        .eq('id', recipientId);
+
+    if (updateError) {
+        alert('❌ Не удалось обновить баланс');
+        return;
+    }
+
+    // Сохраняем транзакцию
+    await window.supabase
+        .from('transactions')
+        .insert({
+            user_id: recipientId,
+            admin_id: currentUser.id,
+            action: 'give_heart',
+            amount: amount,
+            resource: 'hearts',
+            comment: comment
+        });
+
+    // Обновляем локальные данные
+    const recipient = allUsers.find(u => u.id === recipientId);
+    if (recipient) {
+        recipient.hearts = newHearts;
+    }
+
+    this.closeHeartModal();
+    alert(`✅ ${amount} сердечек отправлено ${recipientName}!`);
+}
     transformBitrixUser(bxUser) {
         const id = parseInt(bxUser.ID, 10);
         const name = (bxUser.NAME || '') + ' ' + (bxUser.LAST_NAME || '');
@@ -324,30 +433,43 @@ class GameLabApp {
     }
 
     updateProfile() {
-        this.setElementText('profile-name', currentUser.name);
-        this.setElementText('profile-position', currentUser.position);
-        this.setElementText('profile-coins', currentUser.coins);
-        this.setElementText('profile-exp', currentUser.exp);
-        this.setElementText('profile-score', currentUser.score);
-        this.updateAvatar('profile-avatar', currentUser);
+    this.setElementText('profile-name', currentUser.name);
+    this.setElementText('profile-position', currentUser.position);
+    this.setElementText('profile-coins', currentUser.coins);
+    this.setElementText('profile-exp', currentUser.exp);
+    this.setElementText('profile-score', currentUser.score);
+    this.updateAvatar('profile-avatar', currentUser);
 
-        const actions = document.getElementById('natalia-actions');
-        if (this.isNatalia()) {
-            if (!actions) {
-                const div = document.createElement('div');
-                div.id = 'natalia-actions';
-                div.innerHTML = `
-                    <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn" onclick="app.showAddCoinsModal()">➕ Добавить Bus‑коины</button>
-                        <button class="btn" onclick="app.showDeductCoinsModal()">➖ Списать Bus‑коины</button>
-                    </div>
-                `;
-                document.querySelector('.profile-info').appendChild(div);
-            }
-        } else if (actions) {
-            actions.remove();
+    const nataliaActions = document.getElementById('natalia-actions');
+    const heartAction = document.getElementById('heart-action');
+
+    if (this.isNatalia()) {
+        // Кнопки Натальи
+        if (!nataliaActions) {
+            const div = document.createElement('div');
+            div.id = 'natalia-actions';
+            div.innerHTML = `
+                <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn" onclick="app.showAddCoinsModal()">➕ Добавить Bus‑коины</button>
+                    <button class="btn" onclick="app.showDeductCoinsModal()">➖ Списать Bus‑коины</button>
+                </div>
+            `;
+            document.querySelector('.profile-info').appendChild(div);
+        }
+        if (heartAction) heartAction.remove();
+    } else {
+        // Кнопка сердечка для обычных пользователей
+        if (nataliaActions) nataliaActions.remove();
+        if (!heartAction) {
+            const btn = document.createElement('button');
+            btn.id = 'heart-action';
+            btn.className = 'btn';
+            btn.textContent = '❤️ Подарить сердечко';
+            btn.onclick = () => this.showGiveHeartModal();
+            document.querySelector('.profile-info').appendChild(btn);
         }
     }
+}
 
     setElementText(id, text) {
         const el = document.getElementById(id);
@@ -890,6 +1012,7 @@ window.closeUserModal = () => app.closeUserModal();
 window.closeItemModal = () => app.closeItemModal();
 window.closeCoinsModal = () => app.closeCoinsModal();
 window.submitCoinsOperation = () => app.submitCoinsOperation();
+window.closeHeartModal = () => app.closeHeartModal();
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
