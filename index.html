@@ -270,8 +270,10 @@
         
         <div style="margin: 15px 0;">
             <label>Кому вы хотите подарить сердечко?</label>
-            <input type="text" id="heart-recipient-search" list="heart-recipients-list" class="auth-input" placeholder="Начните вводить имя...">
-            <datalist id="heart-recipients-list"></datalist>
+            <select id="heart-recipient-select" class="auth-input" style="width: 100%; padding: 8px; margin-top: 5px;">
+                <option value="">Выберите коллегу</option>
+                <!-- Опции будут добавлены через JS -->
+            </select>
             <div id="heart-recipient-error" style="color: red; margin-top: 5px; display: none;">Выберите коллегу</div>
         </div>
 
