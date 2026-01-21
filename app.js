@@ -303,6 +303,7 @@ class GameLabApp {
             avatar_initials: fullUser?.avatar_initials || name.charAt(0),
             hearts: fullUser?.hearts || 0
         };
+        localStorage.setItem('gamelab_user_id', currentUser.id);
 
         document.getElementById('auth-section').style.display = 'none';
         document.getElementById('app').style.display = 'block';
@@ -310,12 +311,13 @@ class GameLabApp {
     }
 
     logout() {
-        currentUser = null;
-        document.getElementById('auth-section').style.display = 'block';
-        document.getElementById('app').style.display = 'none';
-        document.getElementById('user-search').value = '';
-        document.getElementById('user-password').value = '';
-    }
+    currentUser = null;
+    localStorage.removeItem('gamelab_user_id'); 
+    document.getElementById('auth-section').style.display = 'block';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('user-search').value = '';
+    document.getElementById('user-password').value = '';
+}
 
     updateUI() {
         if (!currentUser) return;
@@ -630,9 +632,10 @@ class GameLabApp {
     }
 
     showGiveHeartModal() {
-        document.getElementById('heart-modal').classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
+    this.setupHeartRecipientList();
+    document.getElementById('heart-modal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
 
     closeHeartModal() {
         document.getElementById('heart-modal').classList.remove('active');
@@ -740,36 +743,82 @@ class GameLabApp {
     }
 
     async submitHeart() {
-        const comment = document.getElementById('heart-comment').value.trim();
-        if (!comment) {
-            alert('❌ Напишите комментарий');
-            return;
-        }
+    const recipientInput = document.getElementById('heart-recipient-search');
+    const commentInput = document.getElementById('heart-comment');
+    const recipientName = recipientInput?.value.trim();
+    const comment = commentInput?.value.trim();
 
-        // Сохраняем в transactions
-        await window.supabase
-            .from('transactions')
-            .insert({
-                user_id: currentUser.id,
-                admin_id: null,
-                action: 'give_heart',
-                amount: 1,
-                resource: 'hearts',
-                comment: comment
-            });
-
-        // Обновляем локально
-        currentUser.hearts = (currentUser.hearts || 0) + 1;
-        this.updateProfile();
-
-        // Обновляем историю, если открыта
-        if (document.getElementById('history')?.classList.contains('active')) {
-            this.loadHistory();
-        }
-
-        this.closeHeartModal();
-        alert('✅ Сердечко отправлено!');
+    if (!recipientName) {
+        document.getElementById('heart-recipient-error').style.display = 'block';
+        return;
     }
+    if (!comment) {
+        alert('❌ Напишите комментарий');
+        return;
+    }
+
+    // Находим получателя
+    const recipient = allUsers.find(u => u.name === recipientName);
+    if (!recipient) {
+        alert('❌ Пользователь не найден');
+        return;
+    }
+
+    // Обновляем баланс получателя (+1 сердечко)
+    const {  userData, error: fetchError } = await window.supabase
+        .from('users')
+        .select('hearts')
+        .eq('id', recipient.id)
+        .single();
+
+    if (fetchError || !userData) {
+        alert('❌ Ошибка при получении данных получателя');
+        return;
+    }
+
+    const newHearts = (userData.hearts || 0) + 1;
+
+    const { error: updateError } = await window.supabase
+        .from('users')
+        .update({ hearts: newHearts })
+        .eq('id', recipient.id);
+
+    if (updateError) {
+        alert('❌ Не удалось обновить баланс');
+        return;
+    }
+
+    // Сохраняем транзакцию
+    await window.supabase
+        .from('transactions')
+        .insert({
+            user_id: recipient.id,      // получатель
+            admin_id: currentUser.id,   // отправитель
+            action: 'give_heart',
+            amount: 1,
+            resource: 'hearts',
+            comment: comment
+        });
+
+    // Обновляем локальные данные
+    recipient.hearts = newHearts;
+
+    this.closeHeartModal();
+    alert(`✅ Сердечко отправлено ${recipientName}!`);
+}
+    setupHeartRecipientList() {
+    const list = document.getElementById('heart-recipients-list');
+    if (!list) return;
+    list.innerHTML = '';
+    allUsers
+        .filter(u => u.id !== currentUser.id) // нельзя дарить себе
+        .forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.name;
+            option.dataset.id = user.id;
+            list.appendChild(option);
+        });
+}
 
     loadPersonalRating() {
         const el = document.getElementById('personal-rating');
@@ -1004,5 +1053,33 @@ window.closeHeartModal = () => app.closeHeartModal();
 document.addEventListener('DOMContentLoaded', () => {
     app.setupEventListeners();
     app.setupModalClose();
-    app.loadInitialData();
+    app.loadInitialData().then(() => {
+        const savedUserId = localStorage.getItem('gamelab_user_id');
+        if (savedUserId) {
+            const user = allUsers.find(u => u.id == savedUserId);
+            if (user) {
+                // Подгружаем актуальные данные из Supabase
+                window.supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', savedUserId)
+                    .single()
+                    .then(({ data, error }) => {
+                        if (!error && data) {
+                            currentUser = {
+                                ...data,
+                                position: user.position || '—',
+                                avatar_url: user.avatar_url || null,
+                                avatar_color: user.avatar_color || window.CONFIG.colors[0],
+                                avatar_initials: user.avatar_initials || data.name.charAt(0),
+                                hearts: data.hearts || 0
+                            };
+                            document.getElementById('auth-section').style.display = 'none';
+                            document.getElementById('app').style.display = 'block';
+                            app.updateUI();
+                        }
+                    });
+            }
+        }
+    });
 });

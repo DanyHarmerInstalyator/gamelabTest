@@ -263,15 +263,26 @@
     </div>
 
     <!-- Модалка: Подарить сердечко -->
-    <div id="heart-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="app.closeHeartModal()">&times;</span>
-            <h3>❤️ Подарить сердечко</h3>
-            <p>Напишите, за что вы дарите сердечко:</p>
-            <textarea id="heart-comment" placeholder="Спасибо за помощь!" rows="3" style="width: 100%; margin: 10px 0;"></textarea>
-            <button class="btn" onclick="app.submitHeart()">Отправить</button>
+<div id="heart-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="app.closeHeartModal()">&times;</span>
+        <h3>❤️ Подарить сердечко</h3>
+        
+        <div style="margin: 15px 0;">
+            <label>Кому вы хотите подарить сердечко?</label>
+            <input type="text" id="heart-recipient-search" list="heart-recipients-list" class="auth-input" placeholder="Начните вводить имя...">
+            <datalist id="heart-recipients-list"></datalist>
+            <div id="heart-recipient-error" style="color: red; margin-top: 5px; display: none;">Выберите коллегу</div>
         </div>
+
+        <div style="margin: 15px 0;">
+            <label>Комментарий:</label>
+            <textarea id="heart-comment" placeholder="Спасибо за помощь!" rows="3" style="width: 100%;"></textarea>
+        </div>
+
+        <button class="btn" onclick="app.submitHeart()">Отправить</button>
     </div>
+</div>
 
     <!-- Скрипты -->
     <script type="module" src="config.js"></script>
