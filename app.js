@@ -781,7 +781,7 @@ class GameLabApp {
         return;
     }
 
-    // Получаем текущие данные получателя
+    // === ШАГ 1: Получаем текущие данные ПОЛУЧАТЕЛЯ из Supabase ===
     const {  userData, error: fetchError } = await window.supabase
         .from('users')
         .select('hearts')
@@ -789,10 +789,12 @@ class GameLabApp {
         .single();
 
     if (fetchError || !userData) {
-        alert('❌ Ошибка при получении данных получателя');
+        console.error('Ошибка загрузки получателя:', fetchError);
+        alert('❌ Получатель не найден в базе');
         return;
     }
 
+    // === ШАГ 2: Обновляем hearts (+1) ===
     const newHearts = (userData.hearts || 0) + 1;
 
     const { error: updateError } = await window.supabase
@@ -801,27 +803,32 @@ class GameLabApp {
         .eq('id', recipientId);
 
     if (updateError) {
+        console.error('Ошибка обновления:', updateError);
         alert('❌ Не удалось обновить баланс');
         return;
     }
 
-    // Сохраняем транзакцию
+    // === ШАГ 3: Сохраняем транзакцию ===
     await window.supabase
         .from('transactions')
         .insert({
-            user_id: recipientId,
-            admin_id: currentUser.id,
+            user_id: recipientId,      // получатель
+            admin_id: currentUser.id, // отправитель
             action: 'give_heart',
-            amount: 1,
+            amount: 1,                // ← всегда 1 (как в правилах)
             resource: 'hearts',
             comment: comment
         });
 
-    // Обновляем локальные данные
+    // === ШАГ 4: Обновляем локальные данные ===
     const recipient = allUsers.find(u => u.id === recipientId);
     if (recipient) {
-        recipient.hearts = newHearts;
+        recipient.hearts = newHearts; // ← обновляем в списке
     }
+
+    // === ШАГ 5: Обновляем UI (если открыт профиль получателя) ===
+    this.updateUI(); // ← обновляет текущего пользователя
+    this.loadColleaguesList(); // ← обновляет список
 
     this.closeHeartModal();
     alert(`✅ Сердечко отправлено!`);
