@@ -137,8 +137,7 @@ class GameLabApp {
         const modals = [
             { id: 'user-modal', closeFn: () => this.closeUserModal() },
             { id: 'item-modal', closeFn: () => this.closeItemModal() },
-            { id: 'coins-modal', closeFn: () => this.closeCoinsModal() },
-            { id: 'heart-modal', closeFn: () => this.closeHeartModal() }
+            { id: 'coins-modal', closeFn: () => this.closeCoinsModal() }
         ];
 
         modals.forEach(({ id, closeFn }) => {
@@ -212,8 +211,7 @@ class GameLabApp {
             avatar_initials: "ДБ",
             coins: 500,
             exp: 300,
-            score: 10,
-            hearts: 0
+            score: 10
         }];
     }
 
@@ -229,7 +227,7 @@ class GameLabApp {
 
             const { data, error } = await window.supabase
                 .from('users')
-                .select('id, name, coins, exp, score, hearts');
+                .select('id, name, coins, exp, score');
 
             if (error) throw error;
 
@@ -244,8 +242,7 @@ class GameLabApp {
                     avatar_initials: bitrix.avatar_initials || su.name.charAt(0),
                     coins: su.coins,
                     exp: su.exp,
-                    score: su.score,
-                    hearts: su.hearts || 0
+                    score: su.score
                 };
             });
 
@@ -300,17 +297,8 @@ class GameLabApp {
             position: fullUser?.position || '—',
             avatar_url: fullUser?.avatar_url || null,
             avatar_color: fullUser?.avatar_color || window.CONFIG.colors[0],
-            avatar_initials: fullUser?.avatar_initials || name.charAt(0),
-            hearts: data.hearts || 0
+            avatar_initials: fullUser?.avatar_initials || name.charAt(0)
         };
-
-        // Обновляем allUsers
-        const idx = allUsers.findIndex(u => u.id === data.id);
-        if (idx !== -1) {
-            allUsers[idx] = currentUser;
-        }
-
-        localStorage.setItem('gamelab_user_id', currentUser.id);
 
         document.getElementById('auth-section').style.display = 'none';
         document.getElementById('app').style.display = 'block';
@@ -319,7 +307,6 @@ class GameLabApp {
 
     logout() {
         currentUser = null;
-        localStorage.removeItem('gamelab_user_id');
         document.getElementById('auth-section').style.display = 'block';
         document.getElementById('app').style.display = 'none';
         document.getElementById('user-search').value = '';
@@ -342,12 +329,9 @@ class GameLabApp {
         this.setElementText('profile-coins', currentUser.coins);
         this.setElementText('profile-exp', currentUser.exp);
         this.setElementText('profile-score', currentUser.score);
-        this.setElementText('profile-hearts', currentUser.hearts || 0);
         this.updateAvatar('profile-avatar', currentUser);
 
         const actions = document.getElementById('natalia-actions');
-        const heartBtn = document.getElementById('give-heart-btn');
-
         if (this.isNatalia()) {
             if (!actions) {
                 const div = document.createElement('div');
@@ -360,17 +344,8 @@ class GameLabApp {
                 `;
                 document.querySelector('.profile-info').appendChild(div);
             }
-            if (heartBtn) heartBtn.remove();
-        } else {
-            if (actions) actions.remove();
-            if (!heartBtn) {
-                const btn = document.createElement('button');
-                btn.id = 'give-heart-btn';
-                btn.className = 'btn';
-                btn.textContent = '❤️ Подарить сердечко';
-                btn.onclick = () => this.showGiveHeartModal();
-                document.querySelector('.profile-info').appendChild(btn);
-            }
+        } else if (actions) {
+            actions.remove();
         }
     }
 
@@ -444,11 +419,7 @@ class GameLabApp {
                                 </div>
                                 <div class="user-stat">
                                     <div class="user-stat-value score-color">${user.score}</div>
-                                    <div class="user-stat-label">Звёзды</div>
-                                </div>
-                                <div class="user-stat">
-                                    <div class="user-stat-value hearts-color">${user.hearts || 0}</div>
-                                    <div class="user-stat-label">Сердечки</div>
+                                    <div class="user-stat-label">Очки</div>
                                 </div>
                             </div>
                         </div>
@@ -472,7 +443,6 @@ class GameLabApp {
         this.setElementText('modal-coins', user.coins);
         this.setElementText('modal-exp', user.exp);
         this.setElementText('modal-score', user.score);
-        this.setElementText('modal-hearts', user.hearts || 0);
         this.updateAvatar('modal-avatar', user);
         this.loadUserAchievements(user);
         document.getElementById('user-modal').classList.add('active');
@@ -636,54 +606,22 @@ class GameLabApp {
         }
     }
 
-    showGiveHeartModal() {
-    if (!currentUser) {
-        alert('❌ Сначала войдите в систему');
-        return;
-    }
-    this.setupHeartRecipientList();
-    document.getElementById('heart-modal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-    closeHeartModal() {
-        document.getElementById('heart-modal').classList.remove('active');
-        document.body.style.overflow = '';
-        document.getElementById('heart-comment').value = '';
-    }
-
     setupCoinsUserList() {
-    const list = document.getElementById('coins-users-list');
-    const searchInput = document.getElementById('coins-user-search');
-    if (!list || !searchInput) return;
+        const list = document.getElementById('coins-users-list');
+        const searchInput = document.getElementById('coins-user-search');
+        if (!list || !searchInput) return;
 
-    list.innerHTML = '';
-    allUsers
-        .filter(u => !u.name.includes(NATALIA_NAME))
-        .forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.name;
-            option.dataset.id = user.id; // ← обязательно!
-            list.appendChild(option);
-        });
-}
+        list.innerHTML = '';
+        allUsers
+            .filter(u => !u.name.includes(NATALIA_NAME))
+            .forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.name;
+                list.appendChild(option);
+            });
+    }
 
-    setupHeartRecipientList() {
-    const select = document.getElementById('heart-recipient-select');
-    if (!select) return;
-    select.innerHTML = '<option value="">Выберите коллегу</option>';
-    
-    allUsers
-        .filter(u => u.id !== currentUser?.id)
-        .forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.id.toString(); // ← строка числа
-            option.textContent = user.name;
-            select.appendChild(option);
-        });
-}
-
-    async submitCoinsOperation() {
+   async submitCoinsOperation() {
     const searchInput = document.getElementById('coins-user-search');
     const amountInput = document.getElementById('coins-amount');
 
@@ -700,38 +638,36 @@ class GameLabApp {
         return;
     }
 
-    // Получаем ID из datalist
-    let targetId = null;
-    const options = document.querySelectorAll('#coins-users-list option');
-    for (const opt of options) {
-        if (opt.value === targetName) {
-            targetId = parseInt(opt.dataset.id);
-            break;
-        }
-    }
-
-    if (!targetId) {
+    const targetUser = allUsers.find(u => u.name === targetName);
+    if (!targetUser) {
         alert('❌ Пользователь не найден. Выберите из списка.');
         return;
     }
 
-    // Получаем текущие данные
-    const {  userData, error: fetchError } = await window.supabase
+    const targetId = targetUser.id;
+
+    // Запрос к Supabase
+    const { data: userData, error: fetchError } = await window.supabase
         .from('users')
         .select('coins')
         .eq('id', targetId)
         .single();
 
+    // КРИТИЧЕСКАЯ ПРОВЕРКА
     if (fetchError || !userData) {
-        alert('❌ Пользователь не найден в базе');
+        console.error('Пользователь не найден в Supabase:', { targetId, targetName, error: fetchError });
+        alert('❌ Пользователь не найден в базе данных. Убедитесь, что он добавлен в таблицу `users`.');
         return;
     }
 
+    // coins — int4 → число!
+    const currentCoins = userData.coins; // уже число
     let newCoins;
+
     if (this.currentOperation === 'add') {
-        newCoins = userData.coins + amount;
+        newCoins = currentCoins + amount;
     } else if (this.currentOperation === 'deduct') {
-        newCoins = userData.coins - amount;
+        newCoins = currentCoins - amount;
         if (newCoins < 0) {
             alert('❌ Недостаточно коинов');
             return;
@@ -745,112 +681,40 @@ class GameLabApp {
         .eq('id', targetId);
 
     if (updateError) {
+        console.error('Ошибка обновления:', updateError);
         alert('❌ Не удалось обновить баланс');
         return;
     }
 
-    // Сохраняем транзакцию
+    // Сохраняем транзакцию (amount — должно быть числом, но у тебя text → преобразуем)
     await window.supabase
         .from('transactions')
         .insert({
             user_id: targetId,
             admin_id: currentUser.id,
             action: this.currentOperation,
-            amount: amount,
+            amount: amount.toString(), // потому что у тебя amount — text
             resource: 'coins',
             comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
         });
 
     // Обновляем локальные данные
-    const targetUser = allUsers.find(u => u.id === targetId);
-    if (targetUser) {
-        targetUser.coins = newCoins;
+    targetUser.coins = newCoins;
+    if (currentUser && currentUser.id === targetId) {
+        currentUser.coins = newCoins;
     }
 
+    // Обновляем UI
     this.updateUI();
     this.loadColleaguesList();
     this.loadGlobalRating();
+    if (document.getElementById('history')?.classList.contains('active')) {
+        this.loadHistory();
+    }
 
     this.closeCoinsModal();
     const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
     alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
-}
-
-    async submitHeart() {
-    const select = document.getElementById('heart-recipient-select');
-    const commentInput = document.getElementById('heart-comment');
-
-    const recipientIdStr = select?.value;
-    const comment = commentInput?.value.trim();
-
-    // Защита от пустого выбора
-    if (!recipientIdStr || recipientIdStr === '') {
-        document.getElementById('heart-recipient-error').style.display = 'block';
-        return;
-    }
-
-    // Преобразуем в число
-    const recipientId = Number(recipientIdStr);
-
-    // Проверка на корректность
-    if (!Number.isInteger(recipientId) || recipientId <= 0) {
-        console.error('Некорректный ID получателя:', recipientIdStr);
-        alert('❌ Некорректный получатель');
-        return;
-    }
-
-    if (!comment) {
-        alert('❌ Напишите комментарий');
-        return;
-    }
-
-    // Запрос к Supabase
-    const {  userData, error: fetchError } = await window.supabase
-        .from('users')
-        .select('hearts')
-        .eq('id', recipientId)
-        .single();
-
-    if (fetchError || !userData) {
-        console.error('Supabase ошибка:', fetchError);
-        console.error('Запрашиваемый ID:', recipientId);
-        alert('❌ Получатель не найден в базе');
-        return;
-    }
-
-    const newHearts = (userData.hearts || 0) + 1;
-
-    const { error: updateError } = await window.supabase
-        .from('users')
-        .update({ hearts: newHearts })
-        .eq('id', recipientId);
-
-    if (updateError) {
-        console.error('Ошибка обновления:', updateError);
-        alert('❌ Не удалось обновить баланс');
-        return;
-    }
-
-    // Сохраняем транзакцию
-    await window.supabase
-        .from('transactions')
-        .insert({
-            user_id: recipientId,
-            admin_id: currentUser.id,
-            action: 'give_heart',
-            amount: 1,
-            resource: 'hearts',
-            comment: comment
-        });
-
-    // Обновляем локальные данные
-    const recipient = allUsers.find(u => u.id === recipientId);
-    if (recipient) {
-        recipient.hearts = newHearts;
-    }
-
-    this.closeHeartModal();
-    alert(`✅ Сердечко отправлено!`);
 }
 
     loadPersonalRating() {
@@ -880,20 +744,6 @@ class GameLabApp {
                             Опыт:
                         </span>
                         <span class="balance-value exp-color">${currentUser.exp}</span>
-                    </div>
-                    <div class="balance-item">
-                        <span style="display: flex; align-items: center; gap: 8px;">
-                            <img src="./img/star.svg" alt="Stars" style="width: 20px; height: 20px;">
-                            Звёзды:
-                        </span>
-                        <span class="balance-value score-color">${currentUser.score}</span>
-                    </div>
-                    <div class="balance-item">
-                        <span style="display: flex; align-items: center; gap: 8px;">
-                            <img src="./img/heart.svg" alt="Hearts" style="width: 20px; height: 20px;">
-                            Сердечки:
-                        </span>
-                        <span class="balance-value hearts-color">${currentUser.hearts || 0}</span>
                     </div>
                 </div>
             </div>
@@ -935,45 +785,40 @@ class GameLabApp {
         const el = document.getElementById('history-list');
         if (!el || !currentUser) return;
 
-        const switchType = document.getElementById('history-switch')?.dataset.type || 'operations';
         let history = [];
 
-        if (switchType === 'operations') {
+        if (this.isNatalia()) {
             const { data, error } = await window.supabase
                 .from('transactions')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .in('action', ['add', 'deduct'])
+                .select('user_id, action, amount, resource, comment, timestamp')
+                .eq('admin_id', currentUser.id)
                 .order('timestamp', { ascending: false })
                 .limit(50);
 
-            if (!error && data) {
+            if (!error && data && data.length > 0) {
+                const userIds = [...new Set(data.map(t => t.user_id))];
+                
+                let usersData = [];
+                if (userIds.length > 0) {
+                    const userResponse = await window.supabase
+                        .from('users')
+                        .select('id, name')
+                        .in('id', userIds);
+                    
+                    if (!userResponse.error && userResponse.data) {
+                        usersData = userResponse.data;
+                    }
+                }
+
+                const userMap = new Map(usersData.map(u => [u.id, u.name]));
+
                 history = data.map(item => ({
                     date: item.timestamp,
                     resource: item.resource,
                     amount: item.action === 'add' ? item.amount : -item.amount,
-                    admin: item.admin_id ? 'Админ' : 'Система',
+                    admin: 'Вы',
                     comment: item.comment || `Операция: ${item.action}`,
-                    type: 'operation'
-                }));
-            }
-        } else if (switchType === 'purchases') {
-            const { data, error } = await window.supabase
-                .from('transactions')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .eq('action', 'buy')
-                .order('timestamp', { ascending: false })
-                .limit(50);
-
-            if (!error && data) {
-                history = data.map(item => ({
-                    date: item.timestamp,
-                    resource: 'item',
-                    amount: -item.amount,
-                    admin: 'Магазин',
-                    comment: item.comment || 'Покупка',
-                    type: 'purchase'
+                    target: userMap.get(item.user_id) || 'Неизвестный'
                 }));
             }
         }
@@ -990,22 +835,19 @@ class GameLabApp {
                 const isPositive = item.amount > 0;
                 const amountText = `${isPositive ? '+' : ''}${item.amount}`;
 
-                let iconSrc = './img/coin.svg';
-                if (item.resource === 'hearts') iconSrc = './img/heart.svg';
-
                 return `
                     <div class="history-item fade-in">
                         <div style="color: #666; min-width: 100px;">${formattedDate}</div>
                         <div style="font-weight: bold; color: ${isPositive ? '#4CAF50' : '#FF6B6B'}; min-width: 80px; display: flex; align-items: center; gap: 5px;">
-                            <img src="${iconSrc}" alt="Resource" style="width: 14px; height: 14px;">
+                            <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
                             ${amountText}
                         </div>
-                        <div style="min-width: 120px;">${item.admin}</div>
+                        <div style="min-width: 120px;">${item.target}</div>
                         <div style="flex-grow: 1; color: #666;">${item.comment}</div>
                     </div>
                 `;
             }).join('')
-            : '<div class="loading-text">История пуста</div>';
+            : '<div class="loading-text">История операций пуста</div>';
     }
 
     async buyItem(itemId) {
@@ -1030,42 +872,11 @@ class GameLabApp {
             return;
         }
 
-        await window.supabase
-            .from('transactions')
-            .insert({
-                user_id: currentUser.id,
-                admin_id: null,
-                action: 'buy',
-                amount: item.price,
-                resource: 'item',
-                comment: `Покупка: ${item.name}`
-            });
-
         currentUser.coins -= item.price;
         this.updateProfile();
         this.loadShopItems();
 
         alert(`✅ Товар "${item.name}" успешно куплен!`);
-    }
-
-    switchHistory(type) {
-        const operationsBtn = document.getElementById('history-operations-btn');
-        const purchasesBtn = document.getElementById('history-purchases-btn');
-
-        if (type === 'operations') {
-            operationsBtn.style.backgroundColor = '#8C00AA';
-            operationsBtn.style.color = 'white';
-            purchasesBtn.style.backgroundColor = '';
-            purchasesBtn.style.color = '';
-        } else {
-            purchasesBtn.style.backgroundColor = '#8C00AA';
-            purchasesBtn.style.color = 'white';
-            operationsBtn.style.backgroundColor = '';
-            operationsBtn.style.color = '';
-        }
-
-        document.getElementById('history-switch').dataset.type = type;
-        this.loadHistory();
     }
 }
 
@@ -1079,45 +890,10 @@ window.closeUserModal = () => app.closeUserModal();
 window.closeItemModal = () => app.closeItemModal();
 window.closeCoinsModal = () => app.closeCoinsModal();
 window.submitCoinsOperation = () => app.submitCoinsOperation();
-window.closeHeartModal = () => app.closeHeartModal();
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
     app.setupEventListeners();
     app.setupModalClose();
-    app.loadInitialData().then(() => {
-        const savedUserId = localStorage.getItem('gamelab_user_id');
-        if (savedUserId) {
-            const user = allUsers.find(u => u.id == savedUserId);
-            if (user) {
-                window.supabase
-                    .from('users')
-                    .select('*')
-                    .eq('id', savedUserId)
-                    .single()
-                    .then(({ data, error }) => {
-                        if (!error && data) {
-                            currentUser = {
-                                ...data,
-                                position: user.position || '—',
-                                avatar_url: user.avatar_url || null,
-                                avatar_color: user.avatar_color || window.CONFIG.colors[0],
-                                avatar_initials: user.avatar_initials || data.name.charAt(0),
-                                hearts: data.hearts || 0
-                            };
-
-                            // Обновляем allUsers
-                            const idx = allUsers.findIndex(u => u.id === data.id);
-                            if (idx !== -1) {
-                                allUsers[idx] = currentUser;
-                            }
-
-                            document.getElementById('auth-section').style.display = 'none';
-                            document.getElementById('app').style.display = 'block';
-                            app.updateUI();
-                        }
-                    });
-            }
-        }
-    });
+    app.loadInitialData();
 });
