@@ -192,7 +192,7 @@ setupHeartRecipientList() {
         .forEach(user => {
             const option = document.createElement('option');
             option.value = user.name;
-            option.dataset.id = user.id;
+            option.dataset.id = user.id; // ← обязательно!
             list.appendChild(option);
         });
 }
@@ -219,7 +219,7 @@ async submitHeart() {
         return;
     }
 
-    // Находим ID получателя
+    // === КЛЮЧЕВОЙ БЛОК: получаем ID из datalist ===
     let recipientId = null;
     const options = document.querySelectorAll('#heart-recipients-list option');
     for (const opt of options) {
@@ -234,7 +234,7 @@ async submitHeart() {
         return;
     }
 
-    // Получаем текущие данные получателя
+    // Запрос к Supabase
     const {  userData, error: fetchError } = await window.supabase
         .from('users')
         .select('hearts')
@@ -242,13 +242,13 @@ async submitHeart() {
         .single();
 
     if (fetchError || !userData) {
+        console.error('Ошибка загрузки получателя:', { recipientId, error: fetchError });
         alert('❌ Получатель не найден в базе');
         return;
     }
 
     const newHearts = (userData.hearts || 0) + amount;
 
-    // Обновляем баланс
     const { error: updateError } = await window.supabase
         .from('users')
         .update({ hearts: newHearts })
@@ -278,7 +278,7 @@ async submitHeart() {
     }
 
     this.closeHeartModal();
-    alert(`✅ ${amount} сердечек отправлено ${recipientName}!`);
+    alert(`✅ ${amount} сердечек отправлено!`);
 }
     transformBitrixUser(bxUser) {
         const id = parseInt(bxUser.ID, 10);
