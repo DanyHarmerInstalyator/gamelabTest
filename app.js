@@ -672,8 +672,8 @@ class GameLabApp {
         .filter(u => u.id !== currentUser.id)
         .forEach(user => {
             const option = document.createElement('option');
-            option.value = user.id; // ← сохраняем ID как значение
-            option.textContent = user.name;
+            option.value = user.name; // ← сохраняем ID как значение
+            option.textContent = user.id;
             select.appendChild(option);
         });
 }
