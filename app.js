@@ -229,7 +229,7 @@ class GameLabApp {
 
             const { data, error } = await window.supabase
                 .from('users')
-                .select('id, name, coins, exp, score');
+                .select('id, name, coins, exp, score, hearts');
 
             if (error) throw error;
 
@@ -245,7 +245,7 @@ class GameLabApp {
                     coins: su.coins,
                     exp: su.exp,
                     score: su.score,
-                    hearts: 0 // временно
+                    hearts: su.hearts || 0
                 };
             });
 
@@ -301,7 +301,7 @@ class GameLabApp {
             avatar_url: fullUser?.avatar_url || null,
             avatar_color: fullUser?.avatar_color || window.CONFIG.colors[0],
             avatar_initials: fullUser?.avatar_initials || name.charAt(0),
-            hearts: fullUser?.hearts || 0
+            hearts: data.hearts || 0
         };
         localStorage.setItem('gamelab_user_id', currentUser.id);
 
