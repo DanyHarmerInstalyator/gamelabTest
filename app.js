@@ -351,7 +351,8 @@ async submitHeart() {
                     avatar_initials: bitrix.avatar_initials || su.name.charAt(0),
                     coins: su.coins,
                     exp: su.exp,
-                    score: su.score
+                    score: su.score,
+                    hearts: su.hearts || 0
                 };
             });
 
@@ -406,7 +407,8 @@ async submitHeart() {
             position: fullUser?.position || '—',
             avatar_url: fullUser?.avatar_url || null,
             avatar_color: fullUser?.avatar_color || window.CONFIG.colors[0],
-            avatar_initials: fullUser?.avatar_initials || name.charAt(0)
+            avatar_initials: fullUser?.avatar_initials || name.charAt(0),
+            hearts: data.hearts || 0
         };
 
         document.getElementById('auth-section').style.display = 'none';
