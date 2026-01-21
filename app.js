@@ -336,7 +336,7 @@ async submitHeart() {
 
             const { data, error } = await window.supabase
                 .from('users')
-                .select('id, name, coins, exp, score');
+                .select('id, name, coins, exp, score, hearts');
 
             if (error) throw error;
 
