@@ -5,7 +5,8 @@ const NATALIA_NAME = "Наталья Сюр";
 
 class GameLabApp {
     constructor() {
-        this.currentOperation = 'add'; // 'add' или 'deduct'
+        this.currentOperation = 'add';
+        this.currentHistoryType = 'operations'; // 'add' или 'deduct'
     }
 
     getBitrixWebhook() {
@@ -23,6 +24,34 @@ class GameLabApp {
             el.style.display = 'block';
         }
     }
+
+    switchHistory(type) {
+    // Сохраняем текущий тип истории
+    this.currentHistoryType = type || 'operations';
+    
+    // Обновляем активные кнопки
+    const opsBtn = document.getElementById('history-operations-btn');
+    const purBtn = document.getElementById('history-purchases-btn');
+    
+    if (opsBtn && purBtn) {
+        if (type === 'operations') {
+            opsBtn.classList.add('active');
+            purBtn.classList.remove('active');
+        } else {
+            purBtn.classList.add('active');
+            opsBtn.classList.remove('active');
+        }
+    }
+    
+    // Переключаем отображение
+    const switchEl = document.getElementById('history-switch');
+    if (switchEl) {
+        switchEl.dataset.type = type;
+    }
+    
+    // Загружаем соответствующую историю
+    this.loadHistory();
+}
 
     showRulesTab(tab) {
         const title = document.getElementById('rules-title');
@@ -928,11 +957,16 @@ async submitHeart() {
     }
 
     async loadHistory() {
-        const el = document.getElementById('history-list');
-        if (!el || !currentUser) return;
+    const el = document.getElementById('history-list');
+    if (!el || !currentUser) return;
 
-        let history = [];
+    // Определяем тип истории (по умолчанию - операции)
+    const historyType = this.currentHistoryType || 'operations';
+    
+    let history = [];
 
+    if (historyType === 'operations') {
+        // Загружаем историю операций (старый код)
         if (this.isNatalia()) {
             const { data, error } = await window.supabase
                 .from('transactions')
@@ -967,10 +1001,40 @@ async submitHeart() {
                     target: userMap.get(item.user_id) || 'Неизвестный'
                 }));
             }
-        }
+        } else {
+            // Для обычных пользователей показываем их историю получения коинов
+            const { data, error } = await window.supabase
+                .from('transactions')
+                .select('action, amount, resource, comment, timestamp')
+                .eq('user_id', currentUser.id)
+                .order('timestamp', { ascending: false })
+                .limit(20);
 
-        el.innerHTML = history.length
-            ? history.map(item => {
+            if (!error && data) {
+                history = data.map(item => ({
+                    date: item.timestamp,
+                    resource: item.resource,
+                    amount: item.action === 'add' ? item.amount : -item.amount,
+                    source: item.admin_id ? 'Администратор' : 'Система',
+                    comment: item.comment || `Операция: ${item.action}`
+                }));
+            }
+        }
+    } else if (historyType === 'purchases') {
+        // Загружаем историю покупок
+        // Здесь нужно добавить логику загрузки покупок из таблицы purchases или transactions
+        // Покажем заглушку
+        history = [
+            { date: new Date().toISOString(), item: "Кофе", price: "10", status: "Получено" },
+            { date: new Date(Date.now() - 86400000).toISOString(), item: "Обед", price: "25", status: "Ожидает" }
+        ];
+    }
+
+    // Форматируем вывод в зависимости от типа
+    el.innerHTML = history.length
+        ? history.map(item => {
+            if (historyType === 'operations') {
+                // Формат для операций
                 const d = new Date(item.date);
                 const day = d.getDate();
                 const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -988,42 +1052,30 @@ async submitHeart() {
                             <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
                             ${amountText}
                         </div>
-                        <div style="min-width: 120px;">${item.target}</div>
+                        <div style="min-width: 120px;">${item.target || item.source || '—'}</div>
                         <div style="flex-grow: 1; color: #666;">${item.comment}</div>
                     </div>
                 `;
-            }).join('')
-            : '<div class="loading-text">История операций пуста</div>';
-    }
-
-    async buyItem(itemId) {
-        const item = window.SHOP_ITEMS.find(i => i.id === itemId);
-        if (!item || !currentUser) {
-            alert('❌ Товар не найден');
-            return;
-        }
-
-        if (currentUser.coins < item.price) {
-            alert('❌ Недостаточно Bus‑коинов');
-            return;
-        }
-
-        const { error } = await window.supabase
-            .from('users')
-            .update({ coins: currentUser.coins - item.price })
-            .eq('id', currentUser.id);
-
-        if (error) {
-            alert('❌ Ошибка покупки');
-            return;
-        }
-
-        currentUser.coins -= item.price;
-        this.updateProfile();
-        this.loadShopItems();
-
-        alert(`✅ Товар "${item.name}" успешно куплен!`);
-    }
+            } else {
+                // Формат для покупок
+                const d = new Date(item.date);
+                const formattedDate = `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+                
+                return `
+                    <div class="history-item fade-in">
+                        <div style="color: #666; min-width: 100px;">${formattedDate}</div>
+                        <div style="font-weight: bold; min-width: 120px;">${item.item}</div>
+                        <div style="color: #666; display: flex; align-items: center; gap: 5px; min-width: 80px;">
+                            <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
+                            ${item.price}
+                        </div>
+                        <div style="color: #FF9800; min-width: 80px;">${item.status}</div>
+                    </div>
+                `;
+            }
+        }).join('')
+        : '<div class="loading-text">История пуста</div>';
+}
 }
 
 // Глобальные функции
@@ -1037,6 +1089,7 @@ window.closeItemModal = () => app.closeItemModal();
 window.closeCoinsModal = () => app.closeCoinsModal();
 window.submitCoinsOperation = () => app.submitCoinsOperation();
 window.closeHeartModal = () => app.closeHeartModal();
+window.switchHistory = (type) => app.switchHistory(type);
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
