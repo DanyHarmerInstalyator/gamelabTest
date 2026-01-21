@@ -757,18 +757,26 @@ class GameLabApp {
         return;
     }
 
-    // Находим получателя
-    const recipient = allUsers.find(u => u.name === recipientName);
-    if (!recipient) {
-        alert('❌ Пользователь не найден');
+    // === ИСПРАВЛЕНИЕ: получаем ID из datalist ===
+    let recipientId = null;
+    const options = document.querySelectorAll('#heart-recipients-list option');
+    for (const opt of options) {
+        if (opt.value === recipientName) {
+            recipientId = parseInt(opt.dataset.id);
+            break;
+        }
+    }
+
+    if (!recipientId) {
+        alert('❌ Пользователь не найден. Выберите из списка.');
         return;
     }
 
-    // Обновляем баланс получателя (+1 сердечко)
+    // Получаем текущие данные получателя
     const {  userData, error: fetchError } = await window.supabase
         .from('users')
         .select('hearts')
-        .eq('id', recipient.id)
+        .eq('id', recipientId)
         .single();
 
     if (fetchError || !userData) {
@@ -781,7 +789,7 @@ class GameLabApp {
     const { error: updateError } = await window.supabase
         .from('users')
         .update({ hearts: newHearts })
-        .eq('id', recipient.id);
+        .eq('id', recipientId);
 
     if (updateError) {
         alert('❌ Не удалось обновить баланс');
@@ -792,7 +800,7 @@ class GameLabApp {
     await window.supabase
         .from('transactions')
         .insert({
-            user_id: recipient.id,      // получатель
+            user_id: recipientId,      // получатель
             admin_id: currentUser.id,   // отправитель
             action: 'give_heart',
             amount: 1,
@@ -801,7 +809,10 @@ class GameLabApp {
         });
 
     // Обновляем локальные данные
-    recipient.hearts = newHearts;
+    const recipient = allUsers.find(u => u.id === recipientId);
+    if (recipient) {
+        recipient.hearts = newHearts;
+    }
 
     this.closeHeartModal();
     alert(`✅ Сердечко отправлено ${recipientName}!`);
@@ -811,11 +822,11 @@ class GameLabApp {
     if (!list) return;
     list.innerHTML = '';
     allUsers
-        .filter(u => u.id !== currentUser.id) // нельзя дарить себе
+        .filter(u => u.id !== currentUser.id)
         .forEach(user => {
             const option = document.createElement('option');
             option.value = user.name;
-            option.dataset.id = user.id;
+            option.dataset.id = user.id; // ← сохраняем ID
             list.appendChild(option);
         });
 }
