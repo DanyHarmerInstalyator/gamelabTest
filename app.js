@@ -5,8 +5,30 @@ const NATALIA_NAME = "Наталья Сюр";
 
 class GameLabApp {
     constructor() {
-        this.currentOperation = 'add';
-        this.currentHistoryType = 'operations'; // 'add' или 'deduct'
+        this.currentOperation = 'add'; // 'add' или 'deduct'
+        this.currentHistoryType = 'operations';
+        this.loadAuthState();
+    }
+
+    // Загружаем состояние авторизации из localStorage
+    loadAuthState() {
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
+            try {
+                currentUser = JSON.parse(savedUser);
+            } catch (e) {
+                localStorage.removeItem('currentUser');
+            }
+        }
+    }
+
+    // Сохраняем состояние авторизации
+    saveAuthState() {
+        if (currentUser) {
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        } else {
+            localStorage.removeItem('currentUser');
+        }
     }
 
     getBitrixWebhook() {
@@ -24,34 +46,6 @@ class GameLabApp {
             el.style.display = 'block';
         }
     }
-
-    switchHistory(type) {
-    // Сохраняем текущий тип истории
-    this.currentHistoryType = type || 'operations';
-    
-    // Обновляем активные кнопки
-    const opsBtn = document.getElementById('history-operations-btn');
-    const purBtn = document.getElementById('history-purchases-btn');
-    
-    if (opsBtn && purBtn) {
-        if (type === 'operations') {
-            opsBtn.classList.add('active');
-            purBtn.classList.remove('active');
-        } else {
-            purBtn.classList.add('active');
-            opsBtn.classList.remove('active');
-        }
-    }
-    
-    // Переключаем отображение
-    const switchEl = document.getElementById('history-switch');
-    if (switchEl) {
-        switchEl.dataset.type = type;
-    }
-    
-    // Загружаем соответствующую историю
-    this.loadHistory();
-}
 
     showRulesTab(tab) {
         const title = document.getElementById('rules-title');
@@ -166,7 +160,8 @@ class GameLabApp {
         const modals = [
             { id: 'user-modal', closeFn: () => this.closeUserModal() },
             { id: 'item-modal', closeFn: () => this.closeItemModal() },
-            { id: 'coins-modal', closeFn: () => this.closeCoinsModal() }
+            { id: 'coins-modal', closeFn: () => this.closeCoinsModal() },
+            { id: 'heart-modal', closeFn: () => this.closeHeartModal() }
         ];
 
         modals.forEach(({ id, closeFn }) => {
@@ -199,138 +194,148 @@ class GameLabApp {
             return null;
         }
     }
-showGiveHeartModal() {
-    this.setupHeartRecipientList();
-    document.getElementById('heart-modal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
 
-closeHeartModal() {
-    document.getElementById('heart-modal').classList.remove('active');
-    document.body.style.overflow = '';
-    document.getElementById('heart-comment').value = '';
-    document.getElementById('heart-amount').value = '1';
-}
-
-setupHeartRecipientList() {
-    const list = document.getElementById('heart-recipients-list');
-    if (!list) return;
-    list.innerHTML = '';
-    allUsers
-        .filter(u => u.id !== currentUser.id)
-        .forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.name;
-            option.dataset.id = user.id; // ← обязательно!
-            list.appendChild(option);
-        });
-}
-
-async submitHeart() {
-    const searchInput = document.getElementById('heart-recipient-search');
-    const amountInput = document.getElementById('heart-amount');
-    const commentInput = document.getElementById('heart-comment');
-
-    const recipientName = searchInput?.value.trim();
-    const amount = parseInt(amountInput?.value);
-    const comment = commentInput?.value.trim();
-
-    if (!recipientName) {
-        document.getElementById('heart-recipient-error').style.display = 'block';
-        return;
-    }
-    if (isNaN(amount) || amount < 1 || amount > 10) {
-        alert('❌ Введите количество от 1 до 10');
-        return;
-    }
-    if (!comment) {
-        alert('❌ Напишите комментарий');
-        return;
+    showGiveHeartModal() {
+        this.setupHeartRecipientList();
+        document.getElementById('heart-modal').classList.add('active');
+        document.body.style.overflow = 'hidden';
     }
 
-    // Получаем ID из datalist
-    let recipientId = null;
-    const options = document.querySelectorAll('#heart-recipients-list option');
-    for (const opt of options) {
-        if (opt.value === recipientName) {
-            recipientId = parseInt(opt.dataset.id);
-            break;
-        }
+    closeHeartModal() {
+        document.getElementById('heart-modal').classList.remove('active');
+        document.body.style.overflow = '';
+        document.getElementById('heart-comment').value = '';
+        document.getElementById('heart-amount').value = '1';
+        document.getElementById('heart-recipient-search').value = '';
     }
 
-    if (!recipientId) {
-        alert('❌ Пользователь не найден. Выберите из списка.');
-        return;
-    }
-
-    try {
-        // Получаем текущие данные получателя - ИСПРАВЛЕННАЯ СТРОКА
-        const { data: userData, error: fetchError } = await window.supabase
-            .from('users')
-            .select('hearts')
-            .eq('id', recipientId)
-            .single();
-
-        if (fetchError || !userData) {
-            console.error('Ошибка загрузки получателя:', { recipientId, error: fetchError });
-            alert('❌ Получатель не найден в базе');
-            return;
-        }
-
-        const newHearts = (userData.hearts || 0) + amount;
-
-        // Обновляем баланс получателя
-        const { error: updateError } = await window.supabase
-            .from('users')
-            .update({ hearts: newHearts })
-            .eq('id', recipientId);
-
-        if (updateError) {
-            console.error('Ошибка обновления сердечек:', updateError);
-            alert('❌ Не удалось обновить баланс сердечек');
-            return;
-        }
-
-        // Сохраняем транзакцию
-        const { error: transactionError } = await window.supabase
-            .from('transactions')
-            .insert({
-                user_id: recipientId,
-                admin_id: currentUser.id,
-                action: 'give_heart',
-                amount: amount.toString(),
-                resource: 'hearts',
-                comment: comment
+    setupHeartRecipientList() {
+        const list = document.getElementById('heart-recipients-list');
+        if (!list) return;
+        list.innerHTML = '';
+        allUsers
+            .filter(u => u.id !== currentUser.id)
+            .forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.name;
+                option.dataset.id = user.id;
+                list.appendChild(option);
             });
+    }
 
-        if (transactionError) {
-            console.error('Ошибка сохранения транзакции:', transactionError);
-            alert('❌ Не удалось сохранить операцию');
+    async submitHeart() {
+        const searchInput = document.getElementById('heart-recipient-search');
+        const amountInput = document.getElementById('heart-amount');
+        const commentInput = document.getElementById('heart-comment');
+
+        const recipientName = searchInput?.value.trim();
+        const amount = parseInt(amountInput?.value);
+        const comment = commentInput?.value.trim();
+
+        if (!recipientName) {
+            document.getElementById('heart-recipient-error').style.display = 'block';
+            return;
+        }
+        if (isNaN(amount) || amount < 1 || amount > 10) {
+            alert('❌ Введите количество от 1 до 10');
+            return;
+        }
+        if (!comment) {
+            alert('❌ Напишите комментарий');
             return;
         }
 
-        // === ОБНОВЛЯЕМ ЛОКАЛЬНЫЕ ДАННЫЕ ===
-        const recipient = allUsers.find(u => u.id === recipientId);
-        if (recipient) {
-            recipient.hearts = newHearts;
+        // Получаем ID из datalist
+        let recipientId = null;
+        const options = document.querySelectorAll('#heart-recipients-list option');
+        for (const opt of options) {
+            if (opt.value === recipientName) {
+                recipientId = parseInt(opt.dataset.id);
+                break;
+            }
         }
 
-        // === ОБНОВЛЯЕМ ИНТЕРФЕЙС ===
-        this.updateUI(); // обновляет текущего пользователя
-        this.loadColleaguesList(); // обновляет список коллег
+        if (!recipientId) {
+            alert('❌ Пользователь не найден. Выберите из списка.');
+            return;
+        }
 
-        // Очищаем форму
-        searchInput.value = '';
-        amountInput.value = '1';
-        commentInput.value = '';
+        try {
+            // Получаем текущие данные получателя
+            const { data: userData, error: fetchError } = await window.supabase
+                .from('users')
+                .select('hearts, name')
+                .eq('id', recipientId)
+                .single();
 
-        this.closeHeartModal();
-        alert(`✅ ${amount} сердечек отправлено ${recipientName}!`);
-    } catch (error) {
-        console.error('Критическая ошибка в submitHeart:', error);
-        alert('❌ Произошла ошибка при отправке сердечек');
+            if (fetchError || !userData) {
+                console.error('Ошибка загрузки получателя:', { recipientId, error: fetchError });
+                alert('❌ Получатель не найден в базе');
+                return;
+            }
+
+            const newHearts = (parseInt(userData.hearts) || 0) + amount;
+
+            // Обновляем баланс получателя
+            const { error: updateError } = await window.supabase
+                .from('users')
+                .update({ hearts: newHearts })
+                .eq('id', recipientId);
+
+            if (updateError) {
+                console.error('Ошибка обновления сердечек:', updateError);
+                alert('❌ Не удалось обновить баланс сердечек');
+                return;
+            }
+
+            // Сохраняем транзакцию
+            const { error: transactionError } = await window.supabase
+                .from('transactions')
+                .insert({
+                    user_id: recipientId,
+                    admin_id: currentUser.id,
+                    action: 'give_heart',
+                    amount: amount.toString(),
+                    resource: 'hearts',
+                    comment: comment,
+                    timestamp: new Date().toISOString()
+                });
+
+            if (transactionError) {
+                console.error('Ошибка сохранения транзакции:', transactionError);
+                alert('❌ Не удалось сохранить операцию');
+                return;
+            }
+
+            // Обновляем локальные данные всех пользователей
+            const recipientIndex = allUsers.findIndex(u => u.id === recipientId);
+            if (recipientIndex !== -1) {
+                allUsers[recipientIndex].hearts = newHearts;
+            }
+
+            // Если отправляли себе, обновляем currentUser
+            if (currentUser.id === recipientId) {
+                currentUser.hearts = newHearts;
+                this.saveAuthState();
+            }
+
+            // Обновляем UI
+            this.updateUI();
+            this.loadColleaguesList();
+            
+            // Очищаем форму
+            searchInput.value = '';
+            amountInput.value = '1';
+            commentInput.value = '';
+
+            this.closeHeartModal();
+            alert(`✅ ${amount} сердечек отправлено ${userData.name}!`);
+        } catch (error) {
+            console.error('Критическая ошибка в submitHeart:', error);
+            alert('❌ Произошла ошибка при отправке сердечек');
+        }
     }
-}
+
     transformBitrixUser(bxUser) {
         const id = parseInt(bxUser.ID, 10);
         const name = (bxUser.NAME || '') + ' ' + (bxUser.LAST_NAME || '');
@@ -371,7 +376,8 @@ async submitHeart() {
             avatar_initials: "ДБ",
             coins: 500,
             exp: 300,
-            score: 10
+            score: 10,
+            hearts: 5
         }];
     }
 
@@ -408,6 +414,30 @@ async submitHeart() {
             });
 
             console.log('✅ Загружено пользователей:', allUsers.length);
+            
+            // Проверяем авторизацию и показываем интерфейс
+            if (currentUser) {
+                // Обновляем currentUser актуальными данными
+                const freshUser = allUsers.find(u => u.id === currentUser.id);
+                if (freshUser) {
+                    currentUser = {
+                        ...currentUser,
+                        coins: freshUser.coins,
+                        exp: freshUser.exp,
+                        score: freshUser.score,
+                        hearts: freshUser.hearts,
+                        position: freshUser.position,
+                        avatar_url: freshUser.avatar_url,
+                        avatar_color: freshUser.avatar_color,
+                        avatar_initials: freshUser.avatar_initials
+                    };
+                }
+                
+                document.getElementById('auth-section').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+                this.updateUI();
+            }
+            
             this.setupUserAutocomplete();
         } catch (error) {
             console.error('❌ Ошибка загрузки данных:', error);
@@ -452,6 +482,13 @@ async submitHeart() {
             return;
         }
 
+        // Проверяем пароль (простая проверка для демо)
+        const passwordMatch = password === 'demo_hach' || password === '12345' || password === '123456';
+        if (!passwordMatch) {
+            this.showError('auth-error', 'Неверный пароль');
+            return;
+        }
+
         const fullUser = allUsers.find(u => u.name === name);
         currentUser = {
             ...data,
@@ -462,6 +499,9 @@ async submitHeart() {
             hearts: data.hearts || 0
         };
 
+        // Сохраняем состояние авторизации
+        this.saveAuthState();
+
         document.getElementById('auth-section').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         this.updateUI();
@@ -469,6 +509,7 @@ async submitHeart() {
 
     logout() {
         currentUser = null;
+        localStorage.removeItem('currentUser');
         document.getElementById('auth-section').style.display = 'block';
         document.getElementById('app').style.display = 'none';
         document.getElementById('user-search').value = '';
@@ -486,43 +527,44 @@ async submitHeart() {
     }
 
     updateProfile() {
-    this.setElementText('profile-name', currentUser.name);
-    this.setElementText('profile-position', currentUser.position);
-    this.setElementText('profile-coins', currentUser.coins);
-    this.setElementText('profile-exp', currentUser.exp);
-    this.setElementText('profile-score', currentUser.score);
-    this.updateAvatar('profile-avatar', currentUser);
+        this.setElementText('profile-name', currentUser.name);
+        this.setElementText('profile-position', currentUser.position);
+        this.setElementText('profile-coins', currentUser.coins);
+        this.setElementText('profile-exp', currentUser.exp);
+        this.setElementText('profile-score', currentUser.score);
+        this.setElementText('profile-hearts', currentUser.hearts || 0);
+        this.updateAvatar('profile-avatar', currentUser);
 
-    const nataliaActions = document.getElementById('natalia-actions');
-    const heartAction = document.getElementById('heart-action');
+        const nataliaActions = document.getElementById('natalia-actions');
+        const heartAction = document.getElementById('heart-action');
 
-    if (this.isNatalia()) {
-        // Кнопки Натальи
-        if (!nataliaActions) {
-            const div = document.createElement('div');
-            div.id = 'natalia-actions';
-            div.innerHTML = `
-                <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="btn" onclick="app.showAddCoinsModal()">➕ Добавить Bus‑коины</button>
-                    <button class="btn" onclick="app.showDeductCoinsModal()">➖ Списать Bus‑коины</button>
-                </div>
-            `;
-            document.querySelector('.profile-info').appendChild(div);
-        }
-        if (heartAction) heartAction.remove();
-    } else {
-        // Кнопка сердечка для обычных пользователей
-        if (nataliaActions) nataliaActions.remove();
-        if (!heartAction) {
-            const btn = document.createElement('button');
-            btn.id = 'heart-action';
-            btn.className = 'btn';
-            btn.textContent = '❤️ Подарить сердечко';
-            btn.onclick = () => this.showGiveHeartModal();
-            document.querySelector('.profile-info').appendChild(btn);
+        if (this.isNatalia()) {
+            // Кнопки Натальи
+            if (!nataliaActions) {
+                const div = document.createElement('div');
+                div.id = 'natalia-actions';
+                div.innerHTML = `
+                    <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn" onclick="app.showAddCoinsModal()">➕ Добавить Bus‑коины</button>
+                        <button class="btn" onclick="app.showDeductCoinsModal()">➖ Списать Bus‑коины</button>
+                    </div>
+                `;
+                document.querySelector('.profile-info').appendChild(div);
+            }
+            if (heartAction) heartAction.remove();
+        } else {
+            // Кнопка сердечка для обычных пользователей
+            if (nataliaActions) nataliaActions.remove();
+            if (!heartAction) {
+                const btn = document.createElement('button');
+                btn.id = 'heart-action';
+                btn.className = 'btn';
+                btn.textContent = '❤️ Подарить сердечко';
+                btn.onclick = () => this.showGiveHeartModal();
+                document.querySelector('.profile-info').appendChild(btn);
+            }
         }
     }
-}
 
     setElementText(id, text) {
         const el = document.getElementById(id);
@@ -596,6 +638,10 @@ async submitHeart() {
                                     <div class="user-stat-value score-color">${user.score}</div>
                                     <div class="user-stat-label">Очки</div>
                                 </div>
+                                <div class="user-stat">
+                                    <div class="user-stat-value hearts-color">${user.hearts || 0}</div>
+                                    <div class="user-stat-label">Сердечки</div>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -618,6 +664,7 @@ async submitHeart() {
         this.setElementText('modal-coins', user.coins);
         this.setElementText('modal-exp', user.exp);
         this.setElementText('modal-score', user.score);
+        this.setElementText('modal-hearts', user.hearts || 0);
         this.updateAvatar('modal-avatar', user);
         this.loadUserAchievements(user);
         document.getElementById('user-modal').classList.add('active');
@@ -660,7 +707,14 @@ async submitHeart() {
         
         const sec = document.getElementById(sectionId);
         if (sec) sec.classList.add('active');
-        if (event?.target) event.target.classList.add('active');
+        
+        // Находим соответствующую вкладку навигации
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            if (tab.textContent.includes('Выйти')) return;
+            if (tab.onclick && tab.onclick.toString().includes(sectionId)) {
+                tab.classList.add('active');
+            }
+        });
         
         if (sectionId === 'rules') {
             this.showRulesTab('coins');
@@ -797,100 +851,101 @@ async submitHeart() {
     }
 
    async submitCoinsOperation() {
-    const searchInput = document.getElementById('coins-user-search');
-    const amountInput = document.getElementById('coins-amount');
+        const searchInput = document.getElementById('coins-user-search');
+        const amountInput = document.getElementById('coins-amount');
 
-    if (!searchInput || !amountInput) {
-        alert('❌ Модальное окно не загружено');
-        return;
-    }
-
-    const targetName = searchInput.value.trim();
-    const amount = parseInt(amountInput.value);
-
-    if (!targetName || isNaN(amount) || amount <= 0) {
-        alert('❌ Выберите пользователя и введите сумму');
-        return;
-    }
-
-    const targetUser = allUsers.find(u => u.name === targetName);
-    if (!targetUser) {
-        alert('❌ Пользователь не найден. Выберите из списка.');
-        return;
-    }
-
-    const targetId = targetUser.id;
-
-    // Запрос к Supabase
-    const { data: userData, error: fetchError } = await window.supabase
-        .from('users')
-        .select('coins')
-        .eq('id', targetId)
-        .single();
-
-    // КРИТИЧЕСКАЯ ПРОВЕРКА
-    if (fetchError || !userData) {
-        console.error('Пользователь не найден в Supabase:', { targetId, targetName, error: fetchError });
-        alert('❌ Пользователь не найден в базе данных. Убедитесь, что он добавлен в таблицу `users`.');
-        return;
-    }
-
-    // coins — int4 → число!
-    const currentCoins = userData.coins; // уже число
-    let newCoins;
-
-    if (this.currentOperation === 'add') {
-        newCoins = currentCoins + amount;
-    } else if (this.currentOperation === 'deduct') {
-        newCoins = currentCoins - amount;
-        if (newCoins < 0) {
-            alert('❌ Недостаточно коинов');
+        if (!searchInput || !amountInput) {
+            alert('❌ Модальное окно не загружено');
             return;
         }
+
+        const targetName = searchInput.value.trim();
+        const amount = parseInt(amountInput.value);
+
+        if (!targetName || isNaN(amount) || amount <= 0) {
+            alert('❌ Выберите пользователя и введите сумму');
+            return;
+        }
+
+        const targetUser = allUsers.find(u => u.name === targetName);
+        if (!targetUser) {
+            alert('❌ Пользователь не найден. Выберите из списка.');
+            return;
+        }
+
+        const targetId = targetUser.id;
+
+        // Запрос к Supabase
+        const { data: userData, error: fetchError } = await window.supabase
+            .from('users')
+            .select('coins')
+            .eq('id', targetId)
+            .single();
+
+        // КРИТИЧЕСКАЯ ПРОВЕРКА
+        if (fetchError || !userData) {
+            console.error('Пользователь не найден в Supabase:', { targetId, targetName, error: fetchError });
+            alert('❌ Пользователь не найден в базе данных. Убедитесь, что он добавлен в таблицу `users`.');
+            return;
+        }
+
+        // coins — int4 → число!
+        const currentCoins = userData.coins; // уже число
+        let newCoins;
+
+        if (this.currentOperation === 'add') {
+            newCoins = currentCoins + amount;
+        } else if (this.currentOperation === 'deduct') {
+            newCoins = currentCoins - amount;
+            if (newCoins < 0) {
+                alert('❌ Недостаточно коинов');
+                return;
+            }
+        }
+
+        // Обновляем баланс
+        const { error: updateError } = await window.supabase
+            .from('users')
+            .update({ coins: newCoins })
+            .eq('id', targetId);
+
+        if (updateError) {
+            console.error('Ошибка обновления:', updateError);
+            alert('❌ Не удалось обновить баланс');
+            return;
+        }
+
+        // Сохраняем транзакцию
+        await window.supabase
+            .from('transactions')
+            .insert({
+                user_id: targetId,
+                admin_id: currentUser.id,
+                action: this.currentOperation,
+                amount: amount.toString(),
+                resource: 'coins',
+                comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
+            });
+
+        // Обновляем локальные данные
+        targetUser.coins = newCoins;
+        if (currentUser && currentUser.id === targetId) {
+            currentUser.coins = newCoins;
+            this.saveAuthState();
+        }
+
+        // Обновляем UI
+        this.updateUI();
+        this.loadColleaguesList();
+        this.loadGlobalRating();
+        if (document.getElementById('history')?.classList.contains('active')) {
+            this.loadHistory();
+        }
+
+        this.closeCoinsModal();
+        const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
+        alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
     }
-
-    // Обновляем баланс
-    const { error: updateError } = await window.supabase
-        .from('users')
-        .update({ coins: newCoins })
-        .eq('id', targetId);
-
-    if (updateError) {
-        console.error('Ошибка обновления:', updateError);
-        alert('❌ Не удалось обновить баланс');
-        return;
-    }
-
-    // Сохраняем транзакцию (amount — должно быть числом, но у тебя text → преобразуем)
-    await window.supabase
-        .from('transactions')
-        .insert({
-            user_id: targetId,
-            admin_id: currentUser.id,
-            action: this.currentOperation,
-            amount: amount.toString(), // потому что у тебя amount — text
-            resource: 'coins',
-            comment: `${this.currentOperation === 'add' ? 'Начислено' : 'Списано'} админом ${currentUser.name}`
-        });
-
-    // Обновляем локальные данные
-    targetUser.coins = newCoins;
-    if (currentUser && currentUser.id === targetId) {
-        currentUser.coins = newCoins;
-    }
-
-    // Обновляем UI
-    this.updateUI();
-    this.loadColleaguesList();
-    this.loadGlobalRating();
-    if (document.getElementById('history')?.classList.contains('active')) {
-        this.loadHistory();
-    }
-
-    this.closeCoinsModal();
-    const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
-    alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
-}
 
     loadPersonalRating() {
         const el = document.getElementById('personal-rating');
@@ -957,16 +1012,11 @@ async submitHeart() {
     }
 
     async loadHistory() {
-    const el = document.getElementById('history-list');
-    if (!el || !currentUser) return;
+        const el = document.getElementById('history-list');
+        if (!el || !currentUser) return;
 
-    // Определяем тип истории (по умолчанию - операции)
-    const historyType = this.currentHistoryType || 'operations';
-    
-    let history = [];
+        let history = [];
 
-    if (historyType === 'operations') {
-        // Загружаем историю операций (старый код)
         if (this.isNatalia()) {
             const { data, error } = await window.supabase
                 .from('transactions')
@@ -1001,40 +1051,10 @@ async submitHeart() {
                     target: userMap.get(item.user_id) || 'Неизвестный'
                 }));
             }
-        } else {
-            // Для обычных пользователей показываем их историю получения коинов
-            const { data, error } = await window.supabase
-                .from('transactions')
-                .select('action, amount, resource, comment, timestamp')
-                .eq('user_id', currentUser.id)
-                .order('timestamp', { ascending: false })
-                .limit(20);
-
-            if (!error && data) {
-                history = data.map(item => ({
-                    date: item.timestamp,
-                    resource: item.resource,
-                    amount: item.action === 'add' ? item.amount : -item.amount,
-                    source: item.admin_id ? 'Администратор' : 'Система',
-                    comment: item.comment || `Операция: ${item.action}`
-                }));
-            }
         }
-    } else if (historyType === 'purchases') {
-        // Загружаем историю покупок
-        // Здесь нужно добавить логику загрузки покупок из таблицы purchases или transactions
-        // Покажем заглушку
-        history = [
-            { date: new Date().toISOString(), item: "Кофе", price: "10", status: "Получено" },
-            { date: new Date(Date.now() - 86400000).toISOString(), item: "Обед", price: "25", status: "Ожидает" }
-        ];
-    }
 
-    // Форматируем вывод в зависимости от типа
-    el.innerHTML = history.length
-        ? history.map(item => {
-            if (historyType === 'operations') {
-                // Формат для операций
+        el.innerHTML = history.length
+            ? history.map(item => {
                 const d = new Date(item.date);
                 const day = d.getDate();
                 const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -1052,30 +1072,96 @@ async submitHeart() {
                             <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
                             ${amountText}
                         </div>
-                        <div style="min-width: 120px;">${item.target || item.source || '—'}</div>
+                        <div style="min-width: 120px;">${item.target}</div>
                         <div style="flex-grow: 1; color: #666;">${item.comment}</div>
                     </div>
                 `;
+            }).join('')
+            : '<div class="loading-text">История операций пуста</div>';
+    }
+
+    async buyItem(itemId) {
+        const item = window.SHOP_ITEMS.find(i => i.id === itemId);
+        if (!item || !currentUser) {
+            alert('❌ Товар не найден');
+            return;
+        }
+
+        if (currentUser.coins < item.price) {
+            alert('❌ Недостаточно Bus‑коинов');
+            return;
+        }
+
+        const { error } = await window.supabase
+            .from('users')
+            .update({ coins: currentUser.coins - item.price })
+            .eq('id', currentUser.id);
+
+        if (error) {
+            alert('❌ Ошибка покупки');
+            return;
+        }
+
+        currentUser.coins -= item.price;
+        this.saveAuthState();
+        this.updateProfile();
+        this.loadShopItems();
+
+        alert(`✅ Товар "${item.name}" успешно куплен!`);
+    }
+
+    // Добавляем метод для switchHistory
+    switchHistory(type) {
+        // Сохраняем текущий тип истории
+        this.currentHistoryType = type || 'operations';
+        
+        // Обновляем активные кнопки
+        const opsBtn = document.getElementById('history-operations-btn');
+        const purBtn = document.getElementById('history-purchases-btn');
+        
+        if (opsBtn && purBtn) {
+            if (type === 'operations') {
+                opsBtn.classList.add('active');
+                purBtn.classList.remove('active');
             } else {
-                // Формат для покупок
-                const d = new Date(item.date);
-                const formattedDate = `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
-                
-                return `
-                    <div class="history-item fade-in">
-                        <div style="color: #666; min-width: 100px;">${formattedDate}</div>
-                        <div style="font-weight: bold; min-width: 120px;">${item.item}</div>
-                        <div style="color: #666; display: flex; align-items: center; gap: 5px; min-width: 80px;">
-                            <img src="./img/coin.svg" alt="Coins" style="width: 14px; height: 14px;">
-                            ${item.price}
-                        </div>
-                        <div style="color: #FF9800; min-width: 80px;">${item.status}</div>
-                    </div>
-                `;
+                purBtn.classList.add('active');
+                opsBtn.classList.remove('active');
             }
-        }).join('')
-        : '<div class="loading-text">История пуста</div>';
-}
+        }
+        
+        // Переключаем отображение
+        const switchEl = document.getElementById('history-switch');
+        if (switchEl) {
+            switchEl.dataset.type = type;
+        }
+        
+        // Загружаем соответствующую историю
+        this.loadHistory();
+    }
+
+    // Метод для обновления всех данных
+    async refreshUserData() {
+        if (!currentUser) return;
+        
+        try {
+            const { data, error } = await window.supabase
+                .from('users')
+                .select('id, name, coins, exp, score, hearts')
+                .eq('id', currentUser.id)
+                .single();
+
+            if (!error && data) {
+                currentUser.coins = data.coins;
+                currentUser.exp = data.exp;
+                currentUser.score = data.score;
+                currentUser.hearts = data.hearts || 0;
+                this.saveAuthState();
+                this.updateUI();
+            }
+        } catch (error) {
+            console.error('Ошибка обновления данных:', error);
+        }
+    }
 }
 
 // Глобальные функции
@@ -1089,6 +1175,7 @@ window.closeItemModal = () => app.closeItemModal();
 window.closeCoinsModal = () => app.closeCoinsModal();
 window.submitCoinsOperation = () => app.submitCoinsOperation();
 window.closeHeartModal = () => app.closeHeartModal();
+window.submitHeart = () => app.submitHeart();
 window.switchHistory = (type) => app.switchHistory(type);
 
 // Инициализация
