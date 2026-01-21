@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameLab HDL</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Секция авторизации -->
+    <div id="login-bg"></div>
+    <div id="auth-section" class="card auth-section">
+        <h2>🎮 Вход в GameLab HDL</h2>
+        <p>Введите вашу фамилию для входа в систему</p>
+        
+        <input type="text" id="user-search" class="auth-input" placeholder="Начните вводить фамилию..." list="users-list">
+        <input type="password" id="user-password" placeholder="Пароль" style="margin-top: 8px; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        <datalist id="users-list"></datalist>
+
+        <button onclick="login()" class="btn" style="width: 100%; margin-top: 10px;">Войти</button>
+
+        <div id="auth-error" style="color: red; margin-top: 10px; display: none;"></div>
+        <div id="loading" style="display: none; margin-top: 10px;">⏳ Загрузка данных из Bitrix24...</div>
+    </div>
+
+    <!-- Основное приложение (скрыто до авторизации) -->
+    <div id="app" style="display: none;">
+        <!-- Навигация -->
+        <nav class="nav">
+            <div class="container">
+                <ul class="nav-tabs">
+                    <li class="nav-tab active" onclick="showSection('profile')">Профиль</li>
+                    <li class="nav-tab" onclick="showSection('colleagues')">Коллеги</li>
+                    <li class="nav-tab" onclick="showSection('rating')">Рейтинг</li>
+                    <li class="nav-tab" onclick="showSection('rules')">Правила</li>
+                    <li class="nav-tab" onclick="showSection('shop')">Магазин</li>
+                    <li class="nav-tab" onclick="showSection('history')">История</li>
+                    <li class="nav-tab" onclick="logout()" style="margin-left: auto; color: #666;">Выйти</li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Профиль -->
+            <div id="profile" class="section active">
+                <div class="card">
+                    <div class="profile-header">
+                        <div class="avatar" id="profile-avatar"></div>
+                        <div class="profile-info">
+                            <h2 id="profile-name">-</h2>
+                            <p id="profile-position">-</p>
+                            <div>
+                                <span class="status-online"></span>
+                                <span style="color: #4CAF50;">В сети</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="profile-coins">0</div>
+                            <div class="stat-label">
+                                <img src="./img/coin.svg" alt="Coins" class="stat-icon"> Bus‑коин
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="profile-exp">0</div>
+                            <div class="stat-label">
+                                <img src="./img/exp.svg" alt="Experience" class="stat-icon"> Опыт
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="profile-score">0</div>
+                            <div class="stat-label">
+                                <img src="./img/star.svg" alt="Stars" class="stat-icon"> Звёзды
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value hearts-color" id="profile-hearts">0</div>
+                            <div class="stat-label">
+                                <img src="./img/heart.svg" alt="Hearts" class="stat-icon"> Сердечки
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🏆 Достижения</h3>
+                    <div id="achievements-list">
+                        <div class="loading-text">Загрузка достижений...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📊 Рейтинг</h3>
+                    <div id="personal-rating">
+                        <div class="loading-text">Загрузка рейтинга...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Коллеги -->
+            <div id="colleagues" class="section">
+                <div class="card">
+                    <div class="search-box">
+                        <input type="text" id="colleague-search" class="search-input" placeholder="Поиск коллег...">
+                    </div>
+                    
+                    <div class="user-list" id="colleagues-list">
+                        <div class="loading-text">Загрузка списка коллег...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Рейтинг -->
+            <div id="rating" class="section">
+                <div class="card">
+                    <h3>🏆 Общий рейтинг</h3>
+                    <div id="global-rating">
+                        <div class="loading-text">Загрузка рейтинга...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Правила -->
+            <div id="rules" class="section">
+                <div class="card">
+                    <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+                        <button class="btn" onclick="app.showRulesTab('coins')" id="tab-coins">📋 Bus‑коин</button>
+                        <button class="btn" onclick="app.showRulesTab('hearts')" id="tab-hearts">❤️ HEARTs</button>
+                        <button class="btn" onclick="app.showRulesTab('stars')" id="tab-stars">⭐ STARs</button>
+                        <button class="btn" onclick="app.showRulesTab('levels')" id="tab-levels">🚀 Уровни</button>
+                    </div>
+
+                    <h3 id="rules-title">📋 ПРАВИЛА СИСТЕМЫ: КАК ЗАРАБАТЫВАТЬ Bus‑коин</h3>
+                    <div id="rules-content" class="rules-content">
+                        <!-- Контент будет заменён JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Магазин -->
+            <div id="shop" class="section">
+                <div class="card">
+                    <h3>🛍️ Магазин поощрений</h3>
+                    <div class="shop-grid" id="shop-items">
+                        <div class="loading-text">Загрузка товаров...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- История -->
+            <div id="history" class="section">
+                <div class="card">
+                    <div class="section-header">
+                        <h2>История</h2>
+                        <div style="margin-top: 10px;">
+                            <button id="history-operations-btn" class="btn" onclick="app.switchHistory('operations')">📝 Операции</button>
+                            <button id="history-purchases-btn" class="btn" onclick="app.switchHistory('purchases')">🛒 Покупки</button>
+                            <span id="history-switch" data-type="operations" style="display:none;"></span>
+                        </div>
+                    </div>
+                    <div id="history-list">
+                        <div class="loading-text">Загрузка истории...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeUserModal()">&times;</span>
+            <div class="profile-header">
+                <div class="avatar" id="modal-avatar"></div>
+                <div class="profile-info">
+                    <h2 id="modal-full-name">-</h2>
+                    <p id="modal-position">-</p>
+                </div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value coins-color">
+                        <img src="./img/coin.svg" alt="Coins" class="stat-icon">
+                        <span id="modal-coins">0</span>
+                    </div>
+                    <div class="stat-label">Bus‑коин</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value exp-color">
+                        <img src="./img/exp.svg" alt="Experience" class="stat-icon">
+                        <span id="modal-exp">0</span>
+                    </div>
+                    <div class="stat-label">Опыт</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value score-color">
+                        <img src="./img/star.svg" alt="Stars" class="stat-icon">
+                        <span id="modal-score">0</span>
+                    </div>
+                    <div class="stat-label">Звёзды</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value hearts-color">
+                        <img src="./img/heart.svg" alt="Hearts" class="stat-icon">
+                        <span id="modal-hearts">0</span>
+                    </div>
+                    <div class="stat-label">Сердечки</div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>🏆 Достижения</h3>
+                <div id="modal-achievements">
+                    <div class="loading-text">Загрузка...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="item-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeItemModal()">&times;</span>
+            <div class="item-modal-content">
+                <img id="item-modal-image" src="" alt="" class="item-modal-image">
+                <h3 id="item-modal-name" class="item-modal-name">-</h3>
+                <div class="item-modal-price">
+                    <img src="./img/coin.svg" alt="Coins" style="width: 20px; height: 20px; margin-right: 6px;">
+                    <span id="item-modal-price">0</span> coin
+                </div>
+                <div class="item-modal-description" id="item-modal-description">
+                    Загрузка...
+                </div>
+                <button class="btn" id="item-modal-buy-btn" style="margin-top: 15px; width: 100%;">
+                    Купить за <span id="item-modal-buy-price">0</span> coin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="coins-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeCoinsModal()">&times;</span>
+            <h3 id="coins-modal-title">Добавить коины</h3>
+            
+            <div style="margin: 20px 0;">
+                <label>Выберите сотрудника:</label>
+                <input type="text" id="coins-user-search" list="coins-users-list" class="auth-input" placeholder="Начните вводить имя...">
+                <datalist id="coins-users-list"></datalist>
+                <div id="coins-user-error" style="color: red; margin-top: 5px; display: none;">Пользователь не выбран</div>
+            </div>
+
+            <div style="margin: 20px 0;">
+                <label>Количество Bus‑коинов:</label>
+                <input type="number" id="coins-amount" class="auth-input" min="1" placeholder="Введите число" style="width: 100%;">
+                <div id="coins-amount-error" style="color: red; margin-top: 5px; display: none;">Введите корректное число</div>
+            </div>
+
+            <button class="btn" style="width: 100%;" onclick="submitCoinsOperation()">
+                <span id="coins-modal-action-text">Добавить</span>
+            </button>
+        </div>
+    </div>
+
+   <!-- Модалка: Подарить сердечко -->
+<div id="heart-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="app.closeHeartModal()">&times;</span>
+        <h3>❤️ Подарить сердечко</h3>
+        
+        <div style="margin: 15px 0;">
+            <label>Кому вы хотите подарить сердечко?</label>
+            <input type="text" id="heart-recipient-search" list="heart-recipients-list" class="auth-input" placeholder="Начните вводить имя...">
+            <datalist id="heart-recipients-list"></datalist>
+            <div id="heart-recipient-error" style="color: red; margin-top: 5px; display: none;">Выберите коллегу</div>
+        </div>
+
+        <div style="margin: 15px 0;">
+            <label>Количество сердечек (1–10):</label>
+            <input type="number" id="heart-amount" class="auth-input" min="1" max="10" value="1" style="width: 100%;">
+        </div>
+
+        <div style="margin: 15px 0;">
+            <label>Комментарий:</label>
+            <textarea id="heart-comment" placeholder="Спасибо за помощь!" rows="3" style="width: 100%;"></textarea>
+        </div>
+
+        <button class="btn" onclick="app.submitHeart()">Отправить</button>
+    </div>
+</div>
+
+    <!-- Скрипты -->
+    <script type="module" src="config.js"></script>
+    <script type="module" src="app.js"></script>
+    <script src="animations.js"></script>
+    
+</body>
+</html>
