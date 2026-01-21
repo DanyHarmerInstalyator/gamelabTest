@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HDL Gamification</title>
     <link href="https://fonts.googleapis.com/css2?family=Futura:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="preloader.css">
 </head>
 <body>
+    <!-- Общая дымка -->
+    <div class="fog-overlay"></div>
+    
     <!-- Preloader -->
     <div class="preloader" id="preloader">
         <div class="logo-container">
@@ -17,10 +21,7 @@
             <div class="logo-svg-container">
                 <svg class="logo-svg" viewBox="0 0 8154 3034" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <g clip-path="url(#clip0_1508_2757)">
-                        <!-- Черный фон -->
                         <path d="M8154 0H0V3034H8154V0Z" fill="black"/>
-                        
-                        <!-- Белые буквы с анимацией заливки -->
                         <path class="logo-fill" d="M868.539 557.484H1415.06V1244.19H2256.78V557.484H2810.57V2514.16H2256.78V1672.45H1415.06V2514.16H868.539V557.484Z"/>
                         <path class="logo-fill" d="M3091.24 557.484H4235.71C4398.13 557.484 4523.65 579.564 4619.67 631.282C4723.11 675.59 4804.17 749.388 4863.3 838.004C4929.69 926.621 4973.99 1030.06 5003.63 1148.16C5033.12 1266.27 5047.79 1391.78 5047.79 1524.71C5047.79 1738.84 5025.71 1901.25 4981.26 2012.1C4937.1 2130.2 4877.97 2226.23 4804.17 2300.03C4730.37 2381.23 4649.16 2432.95 4560.4 2455.03C4442.29 2491.93 4331.59 2514.16 4235.56 2514.16H3091.24V557.484ZM3652.29 1000.57V2071.22H4095.38C4206.07 2071.22 4287.43 2056.41 4331.74 2026.92C4383.31 1997.43 4420.21 1945.71 4449.85 1879.32C4471.93 1812.78 4486.75 1694.68 4486.75 1539.67C4486.75 1332.95 4457.26 1192.62 4398.13 1118.82C4339 1037.61 4235.71 1000.71 4095.38 1000.71H3652.29V1000.57Z"/>
                         <path class="logo-fill" d="M5328.47 557.484H5882.25V2071.08H7107.93V2514.16H5328.47V557.484Z"/>
@@ -44,3 +45,13 @@
     <script src="preloader.js"></script>
 </body>
 </html>
+
+<!-- gamification-app/
+├── index.html          # Прелоадер (стартовый файл)
+├── app.html           # Основное приложение
+├── preloader.css      # Стили прелоадера
+├── preloader.js       # Логика прелоадера
+├── style.css          # Основные стили (ваш существующий)
+├── app.js            # Основная логика (существующий, с небольшими оптимизациями)
+├── config.js         # Конфигурация
+└── animations.js     # Анимации -->
