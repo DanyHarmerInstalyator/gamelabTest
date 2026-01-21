@@ -234,56 +234,73 @@ async submitHeart() {
         return;
     }
 
-    // Получаем текущие данные получателя
-    const {  userData, error: fetchError } = await window.supabase
-        .from('users')
-        .select('hearts')
-        .eq('id', recipientId)
-        .single();
+    try {
+        // Получаем текущие данные получателя - ИСПРАВЛЕННАЯ СТРОКА
+        const { data: userData, error: fetchError } = await window.supabase
+            .from('users')
+            .select('hearts')
+            .eq('id', recipientId)
+            .single();
 
-    if (fetchError || !userData) {
-        console.error('Ошибка загрузки получателя:', { recipientId, error: fetchError });
-        alert('❌ Получатель не найден в базе');
-        return;
+        if (fetchError || !userData) {
+            console.error('Ошибка загрузки получателя:', { recipientId, error: fetchError });
+            alert('❌ Получатель не найден в базе');
+            return;
+        }
+
+        const newHearts = (userData.hearts || 0) + amount;
+
+        // Обновляем баланс получателя
+        const { error: updateError } = await window.supabase
+            .from('users')
+            .update({ hearts: newHearts })
+            .eq('id', recipientId);
+
+        if (updateError) {
+            console.error('Ошибка обновления сердечек:', updateError);
+            alert('❌ Не удалось обновить баланс сердечек');
+            return;
+        }
+
+        // Сохраняем транзакцию
+        const { error: transactionError } = await window.supabase
+            .from('transactions')
+            .insert({
+                user_id: recipientId,
+                admin_id: currentUser.id,
+                action: 'give_heart',
+                amount: amount.toString(),
+                resource: 'hearts',
+                comment: comment
+            });
+
+        if (transactionError) {
+            console.error('Ошибка сохранения транзакции:', transactionError);
+            alert('❌ Не удалось сохранить операцию');
+            return;
+        }
+
+        // === ОБНОВЛЯЕМ ЛОКАЛЬНЫЕ ДАННЫЕ ===
+        const recipient = allUsers.find(u => u.id === recipientId);
+        if (recipient) {
+            recipient.hearts = newHearts;
+        }
+
+        // === ОБНОВЛЯЕМ ИНТЕРФЕЙС ===
+        this.updateUI(); // обновляет текущего пользователя
+        this.loadColleaguesList(); // обновляет список коллег
+
+        // Очищаем форму
+        searchInput.value = '';
+        amountInput.value = '1';
+        commentInput.value = '';
+
+        this.closeHeartModal();
+        alert(`✅ ${amount} сердечек отправлено ${recipientName}!`);
+    } catch (error) {
+        console.error('Критическая ошибка в submitHeart:', error);
+        alert('❌ Произошла ошибка при отправке сердечек');
     }
-
-    const newHearts = (userData.hearts || 0) + amount;
-
-    // Обновляем баланс получателя
-    const { error: updateError } = await window.supabase
-        .from('users')
-        .update({ hearts: newHearts })
-        .eq('id', recipientId);
-
-    if (updateError) {
-        alert('❌ Не удалось обновить баланс');
-        return;
-    }
-
-    // Сохраняем транзакцию
-    await window.supabase
-        .from('transactions')
-        .insert({
-            user_id: recipientId,
-            admin_id: currentUser.id,
-            action: 'give_heart',
-            amount: amount,
-            resource: 'hearts',
-            comment: comment
-        });
-
-    // === ОБНОВЛЯЕМ ЛОКАЛЬНЫЕ ДАННЫЕ ===
-    const recipient = allUsers.find(u => u.id === recipientId);
-    if (recipient) {
-        recipient.hearts = newHearts;
-    }
-
-    // === ОБНОВЛЯЕМ ИНТЕРФЕЙС ===
-    this.updateUI(); // обновляет текущего пользователя
-    this.loadColleaguesList(); // обновляет список коллег
-
-    this.closeHeartModal();
-    alert(`✅ ${amount} сердечек отправлено ${recipientName}!`);
 }
     transformBitrixUser(bxUser) {
         const id = parseInt(bxUser.ID, 10);
