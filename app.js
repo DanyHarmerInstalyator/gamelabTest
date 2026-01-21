@@ -671,20 +671,13 @@ class GameLabApp {
     setupHeartRecipientList() {
     const select = document.getElementById('heart-recipient-select');
     if (!select) return;
-
-    // Очищаем, кроме первого option
     select.innerHTML = '<option value="">Выберите коллегу</option>';
-
-    if (!allUsers || allUsers.length === 0) {
-        console.warn('Список пользователей пуст');
-        return;
-    }
-
+    
     allUsers
-        .filter(u => u.id !== currentUser?.id) // нельзя дарить себе
+        .filter(u => u.id !== currentUser?.id)
         .forEach(user => {
             const option = document.createElement('option');
-            option.value = user.id;        // ← ID как число (но сохраняется как строка)
+            option.value = user.id.toString(); // ← строка числа
             option.textContent = user.name;
             select.appendChild(option);
         });
@@ -785,13 +778,18 @@ class GameLabApp {
     const recipientIdStr = select?.value;
     const comment = commentInput?.value.trim();
 
+    // Защита от пустого выбора
     if (!recipientIdStr || recipientIdStr === '') {
         document.getElementById('heart-recipient-error').style.display = 'block';
         return;
     }
 
-    const recipientId = parseInt(recipientIdStr, 10);
-    if (isNaN(recipientId) || recipientId <= 0) {
+    // Преобразуем в число
+    const recipientId = Number(recipientIdStr);
+
+    // Проверка на корректность
+    if (!Number.isInteger(recipientId) || recipientId <= 0) {
+        console.error('Некорректный ID получателя:', recipientIdStr);
         alert('❌ Некорректный получатель');
         return;
     }
@@ -809,8 +807,9 @@ class GameLabApp {
         .single();
 
     if (fetchError || !userData) {
-        console.error('Ошибка загрузки получателя:', fetchError);
-        alert('❌ Получатель не найден в базе данных');
+        console.error('Supabase ошибка:', fetchError);
+        console.error('Запрашиваемый ID:', recipientId);
+        alert('❌ Получатель не найден в базе');
         return;
     }
 
