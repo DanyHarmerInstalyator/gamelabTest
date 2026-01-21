@@ -637,10 +637,14 @@ class GameLabApp {
     }
 
     showGiveHeartModal() {
-        this.setupHeartRecipientList();
-        document.getElementById('heart-modal').classList.add('active');
-        document.body.style.overflow = 'hidden';
+    if (!currentUser) {
+        alert('❌ Сначала войдите в систему');
+        return;
     }
+    this.setupHeartRecipientList();
+    document.getElementById('heart-modal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
 
     closeHeartModal() {
         document.getElementById('heart-modal').classList.remove('active');
@@ -667,12 +671,20 @@ class GameLabApp {
     setupHeartRecipientList() {
     const select = document.getElementById('heart-recipient-select');
     if (!select) return;
+
+    // Очищаем, кроме первого option
     select.innerHTML = '<option value="">Выберите коллегу</option>';
+
+    if (!allUsers || allUsers.length === 0) {
+        console.warn('Список пользователей пуст');
+        return;
+    }
+
     allUsers
-        .filter(u => u.id !== currentUser.id)
+        .filter(u => u.id !== currentUser?.id) // нельзя дарить себе
         .forEach(user => {
             const option = document.createElement('option');
-            option.value = user.id; // ← сохраняем ID как значение
+            option.value = user.id;        // ← ID как число (но сохраняется как строка)
             option.textContent = user.name;
             select.appendChild(option);
         });
@@ -767,21 +779,29 @@ class GameLabApp {
     }
 
     async submitHeart() {
-    const recipientSelect = document.getElementById('heart-recipient-select');
+    const select = document.getElementById('heart-recipient-select');
     const commentInput = document.getElementById('heart-comment');
-    const recipientId = parseInt(recipientSelect?.value);
+
+    const recipientIdStr = select?.value;
     const comment = commentInput?.value.trim();
 
-    if (!recipientId || isNaN(recipientId)) {
+    if (!recipientIdStr || recipientIdStr === '') {
         document.getElementById('heart-recipient-error').style.display = 'block';
         return;
     }
+
+    const recipientId = parseInt(recipientIdStr, 10);
+    if (isNaN(recipientId) || recipientId <= 0) {
+        alert('❌ Некорректный получатель');
+        return;
+    }
+
     if (!comment) {
         alert('❌ Напишите комментарий');
         return;
     }
 
-    // === ШАГ 1: Получаем текущие данные ПОЛУЧАТЕЛЯ из Supabase ===
+    // Запрос к Supabase
     const {  userData, error: fetchError } = await window.supabase
         .from('users')
         .select('hearts')
@@ -790,11 +810,10 @@ class GameLabApp {
 
     if (fetchError || !userData) {
         console.error('Ошибка загрузки получателя:', fetchError);
-        alert('❌ Получатель не найден в базе');
+        alert('❌ Получатель не найден в базе данных');
         return;
     }
 
-    // === ШАГ 2: Обновляем hearts (+1) ===
     const newHearts = (userData.hearts || 0) + 1;
 
     const { error: updateError } = await window.supabase
@@ -808,27 +827,23 @@ class GameLabApp {
         return;
     }
 
-    // === ШАГ 3: Сохраняем транзакцию ===
+    // Сохраняем транзакцию
     await window.supabase
         .from('transactions')
         .insert({
-            user_id: recipientId,      // получатель
-            admin_id: currentUser.id, // отправитель
+            user_id: recipientId,
+            admin_id: currentUser.id,
             action: 'give_heart',
-            amount: 1,                // ← всегда 1 (как в правилах)
+            amount: 1,
             resource: 'hearts',
             comment: comment
         });
 
-    // === ШАГ 4: Обновляем локальные данные ===
+    // Обновляем локальные данные
     const recipient = allUsers.find(u => u.id === recipientId);
     if (recipient) {
-        recipient.hearts = newHearts; // ← обновляем в списке
+        recipient.hearts = newHearts;
     }
-
-    // === ШАГ 5: Обновляем UI (если открыт профиль получателя) ===
-    this.updateUI(); // ← обновляет текущего пользователя
-    this.loadColleaguesList(); // ← обновляет список
 
     this.closeHeartModal();
     alert(`✅ Сердечко отправлено!`);
