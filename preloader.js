@@ -69,21 +69,27 @@ class FastPreloader {
     }
 
     simulateProgress() {
-        const interval = setInterval(() => {
-            // Автоматическое увеличение прогресса
-            const elapsed = Date.now() - this.startTime;
-            const timeProgress = Math.min(elapsed / this.minLoadTime * 60, 60);
-            const randomProgress = 1 + Math.random() * 2;
-            
-            this.progress = Math.min(this.progress + randomProgress, timeProgress, this.maxProgress);
+    const interval = setInterval(() => {
+        // Автоматическое увеличение прогресса
+        const elapsed = Date.now() - this.startTime;
+        const timeProgress = Math.min(elapsed / this.minLoadTime * 80, 80); // ← до 80%
+        const randomProgress = 1 + Math.random() * 2;
+        
+        this.progress = Math.min(this.progress + randomProgress, timeProgress, this.maxProgress);
+        this.updateUI();
+        
+        // Гарантируем достижение 100% через 2.5 секунды
+        if (elapsed > 2500) {
+            this.progress = 100;
             this.updateUI();
-            
-            if (this.progress >= this.maxProgress) {
-                clearInterval(interval);
-                setTimeout(() => this.completeLoading(), 300);
-            }
-        }, 100);
-    }
+        }
+        
+        if (this.progress >= this.maxProgress) {
+            clearInterval(interval);
+            setTimeout(() => this.completeLoading(), 300);
+        }
+    }, 100);
+}
 
     updateProgress(amount) {
         this.progress = Math.min(this.progress + amount, this.maxProgress);
