@@ -156,6 +156,23 @@ class GameLabApp {
         }
     }
 
+    setupHeartRecipientList() {
+        const list = document.getElementById('heart-recipients-list');
+        if (!list) return;
+        
+        list.innerHTML = '';
+        
+        // Фильтруем пользователей - нельзя отправлять себе
+        const filteredUsers = allUsers.filter(u => u.id !== currentUser.id);
+        
+        filteredUsers.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.name;
+            option.dataset.id = user.id;
+            list.appendChild(option);
+        });
+    }
+
     setupModalClose() {
         const modals = [
             { id: 'user-modal', closeFn: () => this.closeUserModal() },
@@ -201,7 +218,7 @@ class GameLabApp {
         alert('❌ У вас нет сердечек для отправки. Получите сердечки от коллег!');
         return;
     }
-    
+
     this.setupHeartRecipientList();
     
     // Показываем текущий баланс сердечек
