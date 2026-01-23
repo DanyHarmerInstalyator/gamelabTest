@@ -79,7 +79,7 @@ class FastPreloader {
         this.updateUI();
         
         // Гарантируем достижение 100% через 2.5 секунды
-        if (elapsed > 2500) {
+        if (elapsed > 3500) {
             this.progress = 100;
             this.updateUI();
         }
