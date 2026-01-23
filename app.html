@@ -271,16 +271,21 @@
         <span class="close-btn" onclick="app.closeHeartModal()">&times;</span>
         <h3>❤️ Подарить сердечко</h3>
         
+        <!-- Информация о балансе будет добавлена динамически -->
+        
         <div style="margin: 15px 0;">
             <label>Кому вы хотите подарить сердечко?</label>
             <input type="text" id="heart-recipient-search" list="heart-recipients-list" class="auth-input" placeholder="Начните вводить имя...">
             <datalist id="heart-recipients-list"></datalist>
-            <div id="heart-recipient-error" style="color: red; margin-top: 5px; display: none;">Выберите коллегу</div>
+            <div id="heart-recipient-error" style="color: #FF6B6B; margin-top: 5px; display: none;">Выберите коллегу</div>
         </div>
 
         <div style="margin: 15px 0;">
             <label>Количество сердечек (1–10):</label>
             <input type="number" id="heart-amount" class="auth-input" min="1" max="10" value="1" style="width: 100%;">
+            <small style="color: var(--text-secondary); font-size: 12px;">
+                * Вы можете отправить не более, чем у вас есть
+            </small>
         </div>
 
         <div style="margin: 15px 0;">
@@ -288,7 +293,7 @@
             <textarea id="heart-comment" placeholder="Спасибо за помощь!" rows="3" style="width: 100%;"></textarea>
         </div>
 
-        <button class="btn" onclick="app.submitHeart()">Отправить</button>
+        <button class="btn" id="heart-submit-btn" onclick="app.submitHeart()">Отправить</button>
     </div>
 </div>
 

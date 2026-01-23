@@ -196,100 +196,143 @@ class GameLabApp {
     }
 
     showGiveHeartModal() {
-        this.setupHeartRecipientList();
-        document.getElementById('heart-modal').classList.add('active');
-        document.body.style.overflow = 'hidden';
+        // Проверяем баланс перед открытием
+    if ((currentUser.hearts || 0) <= 0) {
+        alert('❌ У вас нет сердечек для отправки. Получите сердечки от коллег!');
+        return;
     }
+    
+    this.setupHeartRecipientList();
+    
+    // Показываем текущий баланс сердечек
+    const balanceInfo = document.getElementById('heart-balance-info');
+    if (!balanceInfo) {
+        const modalContent = document.querySelector('#heart-modal .modal-content');
+        if (modalContent) {
+            const balanceDiv = document.createElement('div');
+            balanceDiv.id = 'heart-balance-info';
+            balanceDiv.style.cssText = `
+                margin-bottom: 15px;
+                padding: 10px;
+                background: rgba(255, 107, 107, 0.1);
+                border-radius: 8px;
+                border: 1px solid rgba(255, 107, 107, 0.2);
+                color: var(--text-primary);
+                font-size: 14px;
+            `;
+            balanceDiv.innerHTML = `У вас есть: <span style="font-weight: bold; color: #FF6B6B;">${currentUser.hearts || 0}</span> сердечек`;
+            
+            const modalTitle = modalContent.querySelector('h3');
+            if (modalTitle) {
+                modalTitle.insertAdjacentElement('afterend', balanceDiv);
+            }
+        }
+    } else {
+        balanceInfo.innerHTML = `У вас есть: <span style="font-weight: bold; color: #FF6B6B;">${currentUser.hearts || 0}</span> сердечек`;
+    }
+    
+    document.getElementById('heart-modal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
 
     closeHeartModal() {
-        document.getElementById('heart-modal').classList.remove('active');
-        document.body.style.overflow = '';
-        document.getElementById('heart-comment').value = '';
-        document.getElementById('heart-amount').value = '1';
-        document.getElementById('heart-recipient-search').value = '';
+    document.getElementById('heart-modal').classList.remove('active');
+    document.body.style.overflow = '';
+    document.getElementById('heart-comment').value = '';
+    document.getElementById('heart-amount').value = '1';
+    document.getElementById('heart-recipient-search').value = '';
+    
+    // Удаляем информацию о балансе, если она есть
+    const balanceInfo = document.getElementById('heart-balance-info');
+    if (balanceInfo && balanceInfo.parentNode) {
+        balanceInfo.parentNode.removeChild(balanceInfo);
     }
-
-    setupHeartRecipientList() {
-        const list = document.getElementById('heart-recipients-list');
-        if (!list) return;
-        list.innerHTML = '';
-        allUsers
-            .filter(u => u.id !== currentUser.id)
-            .forEach(user => {
-                const option = document.createElement('option');
-                option.value = user.name;
-                option.dataset.id = user.id;
-                list.appendChild(option);
-            });
-    }
+}
 
     async submitHeart() {
-        const searchInput = document.getElementById('heart-recipient-search');
-        const amountInput = document.getElementById('heart-amount');
-        const commentInput = document.getElementById('heart-comment');
+    const searchInput = document.getElementById('heart-recipient-search');
+    const amountInput = document.getElementById('heart-amount');
+    const commentInput = document.getElementById('heart-comment');
 
-        const recipientName = searchInput?.value.trim();
-        const amount = parseInt(amountInput?.value);
-        const comment = commentInput?.value.trim();
+    const recipientName = searchInput?.value.trim();
+    const amount = parseInt(amountInput?.value);
+    const comment = commentInput?.value.trim();
 
-        if (!recipientName) {
-            document.getElementById('heart-recipient-error').style.display = 'block';
-            return;
+    // Проверка 1: Заполнены ли все поля
+    if (!recipientName) {
+        document.getElementById('heart-recipient-error').style.display = 'block';
+        return;
+    }
+    if (isNaN(amount) || amount < 1 || amount > 10) {
+        alert('❌ Введите количество от 1 до 10');
+        return;
+    }
+    if (!comment) {
+        alert('❌ Напишите комментарий');
+        return;
+    }
+
+    // === ПРОВЕРКА БАЛАНСА: Нельзя отправлять сердечек, если их 0 ===
+    const userHearts = currentUser.hearts || 0;
+    if (userHearts <= 0) {
+        alert('❌ У вас нет сердечек для отправки. Получите сердечки от коллег!');
+        return;
+    }
+    
+    // Проверка: Нельзя отправить больше, чем есть
+    if (amount > userHearts) {
+        alert(`❌ У вас только ${userHearts} сердечек. Нельзя отправить ${amount}.`);
+        return;
+    }
+    // === КОНЕЦ ПРОВЕРКИ БАЛАНСА ===
+
+    // Получаем ID из datalist
+    let recipientId = null;
+    let recipient = null;
+    const options = document.querySelectorAll('#heart-recipients-list option');
+    for (const opt of options) {
+        if (opt.value === recipientName) {
+            recipientId = parseInt(opt.dataset.id);
+            recipient = allUsers.find(u => u.id === recipientId);
+            break;
         }
-        if (isNaN(amount) || amount < 1 || amount > 10) {
-            alert('❌ Введите количество от 1 до 10');
-            return;
-        }
-        if (!comment) {
-            alert('❌ Напишите комментарий');
-            return;
-        }
+    }
 
-        // Получаем ID из datalist
-        let recipientId = null;
-        const options = document.querySelectorAll('#heart-recipients-list option');
-        for (const opt of options) {
-            if (opt.value === recipientName) {
-                recipientId = parseInt(opt.dataset.id);
-                break;
-            }
-        }
+    if (!recipientId || !recipient) {
+        alert('❌ Пользователь не найден. Выберите из списка.');
+        return;
+    }
 
-        if (!recipientId) {
-            alert('❌ Пользователь не найден. Выберите из списка.');
-            return;
-        }
+    // Показываем лоадер
+    const submitBtn = document.querySelector('#heart-modal .btn');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Отправка...';
+    submitBtn.disabled = true;
 
-        try {
-            // Получаем текущие данные получателя
-            const { data: userData, error: fetchError } = await window.supabase
-                .from('users')
-                .select('hearts, name')
-                .eq('id', recipientId)
-                .single();
+    try {
+        // Рассчитываем новое значение на клиенте (быстрее)
+        const currentHearts = recipient.hearts || 0;
+        const newHearts = currentHearts + amount;
+        
+        // === ОБНОВЛЯЕМ БАЛАНС ОТПРАВИТЕЛЯ (вычитаем сердечки) ===
+        const senderNewHearts = userHearts - amount;
 
-            if (fetchError || !userData) {
-                console.error('Ошибка загрузки получателя:', { recipientId, error: fetchError });
-                alert('❌ Получатель не найден в базе');
-                return;
-            }
-
-            const newHearts = (parseInt(userData.hearts) || 0) + amount;
-
+        // Параллельно выполняем все операции
+        const [updateRecipientResult, updateSenderResult, transactionResult] = await Promise.all([
             // Обновляем баланс получателя
-            const { error: updateError } = await window.supabase
+            window.supabase
                 .from('users')
                 .update({ hearts: newHearts })
-                .eq('id', recipientId);
-
-            if (updateError) {
-                console.error('Ошибка обновления сердечек:', updateError);
-                alert('❌ Не удалось обновить баланс сердечек');
-                return;
-            }
-
+                .eq('id', recipientId),
+            
+            // Обновляем баланс отправителя (вычитаем сердечки)
+            window.supabase
+                .from('users')
+                .update({ hearts: senderNewHearts })
+                .eq('id', currentUser.id),
+            
             // Сохраняем транзакцию
-            const { error: transactionError } = await window.supabase
+            window.supabase
                 .from('transactions')
                 .insert({
                     user_id: recipientId,
@@ -299,42 +342,46 @@ class GameLabApp {
                     resource: 'hearts',
                     comment: comment,
                     timestamp: new Date().toISOString()
-                });
+                })
+        ]);
 
-            if (transactionError) {
-                console.error('Ошибка сохранения транзакции:', transactionError);
-                alert('❌ Не удалось сохранить операцию');
-                return;
-            }
+        if (updateRecipientResult.error) throw updateRecipientResult.error;
+        if (updateSenderResult.error) throw updateSenderResult.error;
+        if (transactionResult.error) throw transactionResult.error;
 
-            // Обновляем локальные данные всех пользователей
-            const recipientIndex = allUsers.findIndex(u => u.id === recipientId);
-            if (recipientIndex !== -1) {
-                allUsers[recipientIndex].hearts = newHearts;
-            }
+        // Мгновенно обновляем локальные данные
+        recipient.hearts = newHearts;
+        
+        // Обновляем баланс текущего пользователя
+        currentUser.hearts = senderNewHearts;
+        this.saveAuthState();
 
-            // Если отправляли себе, обновляем currentUser
-            if (currentUser.id === recipientId) {
-                currentUser.hearts = newHearts;
-                this.saveAuthState();
-            }
-
-            // Обновляем UI
-            this.updateUI();
-            this.loadColleaguesList();
-            
-            // Очищаем форму
-            searchInput.value = '';
-            amountInput.value = '1';
-            commentInput.value = '';
-
-            this.closeHeartModal();
-            alert(`✅ ${amount} сердечек отправлено ${userData.name}!`);
-        } catch (error) {
-            console.error('Критическая ошибка в submitHeart:', error);
-            alert('❌ Произошла ошибка при отправке сердечек');
+        // Мгновенно обновляем UI
+        this.updateUI();
+        this.loadColleaguesList();
+        
+        // Обновляем информацию о балансе в модалке
+        const balanceInfo = document.getElementById('heart-balance-info');
+        if (balanceInfo) {
+            balanceInfo.innerHTML = `У вас есть: <span style="font-weight: bold; color: #FF6B6B;">${senderNewHearts}</span> сердечек`;
         }
+        
+        // Очищаем форму
+        searchInput.value = '';
+        amountInput.value = '1';
+        commentInput.value = '';
+
+        this.closeHeartModal();
+        alert(`✅ ${amount} сердечек отправлено ${recipient.name}!`);
+    } catch (error) {
+        console.error('Ошибка при отправке сердечек:', error);
+        alert('❌ Произошла ошибка при отправке сердечек');
+    } finally {
+        // Восстанавливаем кнопку
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
     }
+}
 
     transformBitrixUser(bxUser) {
         const id = parseInt(bxUser.ID, 10);
@@ -559,16 +606,38 @@ class GameLabApp {
         } else {
             // Кнопка сердечка для обычных пользователей
             if (nataliaActions) nataliaActions.remove();
-            if (!heartAction) {
-                const btn = document.createElement('button');
-                btn.id = 'heart-action';
-                btn.className = 'btn';
-                btn.textContent = '❤️ Подарить сердечко';
-                btn.onclick = () => this.showGiveHeartModal();
-                document.querySelector('.profile-info').appendChild(btn);
+        if (!heartAction) {
+            const btn = document.createElement('button');
+            btn.id = 'heart-action';
+            btn.className = 'btn';
+            btn.textContent = '❤️ Подарить сердечко';
+            
+            // Делаем кнопку неактивной, если нет сердечек
+            if ((currentUser.hearts || 0) <= 0) {
+                btn.disabled = true;
+                btn.title = 'У вас нет сердечек для отправки';
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            }
+            
+            btn.onclick = () => this.showGiveHeartModal();
+            document.querySelector('.profile-info').appendChild(btn);
+        } else {
+            // Обновляем состояние существующей кнопки
+            if ((currentUser.hearts || 0) <= 0) {
+                heartAction.disabled = true;
+                heartAction.title = 'У вас нет сердечек для отправки';
+                heartAction.style.opacity = '0.5';
+                heartAction.style.cursor = 'not-allowed';
+            } else {
+                heartAction.disabled = false;
+                heartAction.title = '';
+                heartAction.style.opacity = '1';
+                heartAction.style.cursor = 'pointer';
             }
         }
     }
+}
 
     setElementText(id, text) {
         const el = document.getElementById(id);
