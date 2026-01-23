@@ -463,49 +463,53 @@ class GameLabApp {
     }
 
     async login() {
-        const name = document.getElementById('user-search')?.value.trim();
-        const password = document.getElementById('user-password')?.value.trim();
+    const name = document.getElementById('user-search')?.value.trim();
+    const password = document.getElementById('user-password')?.value.trim();
 
-        if (!name || !password) {
-            this.showError('auth-error', 'Введите имя и пароль');
-            return;
-        }
-
-        const { data, error } = await window.supabase
-            .from('users')
-            .select('*')
-            .eq('name', name)
-            .single();
-
-        if (error || !data) {
-            this.showError('auth-error', 'Пользователь не найден');
-            return;
-        }
-
-        // Проверяем пароль (простая проверка для демо)
-        const passwordMatch = password === 'demo_hach' || password === '12345' || password === '123456';
-        if (!passwordMatch) {
-            this.showError('auth-error', 'Неверный пароль');
-            return;
-        }
-
-        const fullUser = allUsers.find(u => u.name === name);
-        currentUser = {
-            ...data,
-            position: fullUser?.position || '—',
-            avatar_url: fullUser?.avatar_url || null,
-            avatar_color: fullUser?.avatar_color || window.CONFIG.colors[0],
-            avatar_initials: fullUser?.avatar_initials || name.charAt(0),
-            hearts: data.hearts || 0
-        };
-
-        // Сохраняем состояние авторизации
-        this.saveAuthState();
-
-        document.getElementById('auth-section').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        this.updateUI();
+    if (!name || !password) {
+        this.showError('auth-error', 'Введите имя и пароль');
+        return;
     }
+
+    const { data, error } = await window.supabase
+        .from('users')
+        .select('*')
+        .eq('name', name)
+        .single();
+
+    if (error || !data) {
+        this.showError('auth-error', 'Пользователь не найден');
+        return;
+    }
+
+    // === ИЗМЕНЕННЫЙ КОД: Проверяем пароль из базы данных ===
+    // Получаем пароль из колонки password_hash
+    const dbPassword = data.password_hash;
+    
+    // Проверяем пароль
+    if (!dbPassword || password !== dbPassword) {
+        this.showError('auth-error', 'Неверный пароль');
+        return;
+    }
+    // === КОНЕЦ ИЗМЕНЕНИЙ ===
+
+    const fullUser = allUsers.find(u => u.name === name);
+    currentUser = {
+        ...data,
+        position: fullUser?.position || '—',
+        avatar_url: fullUser?.avatar_url || null,
+        avatar_color: fullUser?.avatar_color || window.CONFIG.colors[0],
+        avatar_initials: fullUser?.avatar_initials || name.charAt(0),
+        hearts: data.hearts || 0
+    };
+
+    // Сохраняем состояние авторизации
+    this.saveAuthState();
+
+    document.getElementById('auth-section').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    this.updateUI();
+}
 
     logout() {
         currentUser = null;
