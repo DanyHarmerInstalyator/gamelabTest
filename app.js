@@ -726,7 +726,7 @@ class GameLabApp {
                                 </div>
                                 <div class="user-stat">
                                     <div class="user-stat-value score-color">${user.score}</div>
-                                    <div class="user-stat-label">Очки</div>
+                                    <div class="user-stat-label">Звезды</div>
                                 </div>
                                 <div class="user-stat">
                                     <div class="user-stat-value hearts-color">${user.hearts || 0}</div>
