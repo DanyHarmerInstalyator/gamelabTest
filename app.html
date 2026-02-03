@@ -48,19 +48,16 @@
             <div id="profile" class="section active">
                 <div class="card">
                     <div class="profile-header">
-    <div class="avatar-container">
-        <div class="avatar" id="profile-avatar"></div>
-        <div id="profile-level" class="user-level"></div>
-    </div>
-    <div class="profile-info">
-        <h2 id="profile-name">-</h2>
-        <p id="profile-position">-</p>
-        <div>
-            <span class="status-online"></span>
-            <span style="color: #4CAF50;">В сети</span>
-        </div>
-    </div>
-</div>
+                        <div class="avatar" id="profile-avatar"></div>
+                        <div class="profile-info">
+                            <h2 id="profile-name">-</h2>
+                            <p id="profile-position">-</p>
+                            <div>
+                                <span class="status-online"></span>
+                                <span style="color: #4CAF50;">В сети</span>
+                            </div>
+                        </div>
+                    </div>
                     
                     <div class="stats">
                         <div class="stat-item">
@@ -247,7 +244,7 @@
     <div id="coins-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeCoinsModal()">&times;</span>
-            <h3 id="coins-modal-title">Добавить Bus-коины</h3>
+            <h3 id="coins-modal-title">Добавить коины</h3>
             
             <div style="margin: 20px 0;">
                 <label>Выберите сотрудника:</label>
@@ -297,28 +294,6 @@
         </div>
 
         <button class="btn" id="heart-submit-btn" onclick="app.submitHeart()">Отправить</button>
-    </div>
-</div>
-<!-- Универсальная модалка для начисления ресурсов (только для Натальи Сюр) -->
-<div id="admin-modal" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="app.closeAdminModal()">&times;</span>
-        <h3 id="admin-modal-title">Добавить ресурс</h3>
-        
-        <div style="margin: 20px 0;">
-            <label>Выберите сотрудника:</label>
-            <input type="text" id="admin-user-search" list="admin-users-list" class="auth-input" placeholder="Начните вводить имя...">
-            <datalist id="admin-users-list"></datalist>
-        </div>
-
-        <div style="margin: 20px 0;">
-            <label>Количество:</label>
-            <input type="number" id="admin-amount" class="auth-input" min="1" placeholder="Введите число" style="width: 100%;">
-        </div>
-
-        <button class="btn" style="width: 100%;" onclick="app.submitAdminOperation()">
-            <span id="admin-modal-action-text">Добавить</span>
-        </button>
     </div>
 </div>
 
