@@ -1,5 +1,5 @@
 // frontend/config.js
-const BITRIX_WEBHOOK_URL = "https://hdl.bitrix24.ru/rest/1673/oqdqtcqivivxv8cx/";
+const BITRIX_WEBHOOK_URL = "https://hdl.bitrix24.ru/rest/1673/af1zcnf4o18m5i65/";
 const BITRIX_BASE_URL = "https://hdl.bitrix24.ru";
 
 window.CONFIG = {
@@ -7,6 +7,7 @@ window.CONFIG = {
     supabaseUrl: "https://xmwzifhgjqjnoeflmevm.supabase.co",
     supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhtd3ppZmhnanFqbm9lZmxtZXZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MTk2NTQsImV4cCI6MjA4NDA5NTY1NH0.gw2qTMtPzSBpGKc8i8QZ0MthWTvoPIsci48yeNb3tIA", // ← вставь свой ключ
     bitrixWebhook: BITRIX_WEBHOOK_URL,
+    notificationsRecipientId: 175,
     bitrixBaseUrl: BITRIX_BASE_URL,
     // apiBaseUrl: "http://127.0.0.1:8000", -локально
     apiBaseUrl: "",
