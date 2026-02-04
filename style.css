@@ -828,77 +828,149 @@ body::before {
     z-index: 1000;
     left: 0;
     top: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(10, 10, 18, 0.9);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 10, 18, 0.85); /* Увеличил прозрачность для скорости */
+    backdrop-filter: blur(5px); /* Уменьшил размытие для производительности */
+    -webkit-backdrop-filter: blur(5px);
     display: none;
+    overflow-y: auto; /* Добавил прокрутку для контента */
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* Убираем display:flex из .modal.active - это может вызывать смещение */
+.modal.active {
+    display: block; /* Изменено с flex на block */
+    animation: modalFadeIn 0.2s ease-out; /* Ускорил анимацию */
+}
+
+/* Анимация только для фона */
+@keyframes modalFadeIn {
+    from { 
+        opacity: 0; 
+        backdrop-filter: blur(0px);
+    }
+    to { 
+        opacity: 1; 
+        backdrop-filter: blur(5px);
+    }
+}
+
+/* Контейнер для центрирования контента */
+.modal-content-container {
+    display: flex;
+    min-height: 100%;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 20px 0;
 }
 
-.modal.active {
-    display: flex;
-    animation: modalFadeIn 0.3s ease;
-}
-
-@keyframes modalFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
+/* Содержимое модального окна */
 .modal-content {
-    background: var(--glass-bg);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
+    background: rgba(22, 25, 40, 0.85); /* Упростил стеклянный эффект */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     padding: 30px;
-    border-radius: 25px;
-    width: 90%;
+    border-radius: 20px; /* Немного уменьшил радиус */
+    width: 100%;
     max-width: 500px;
     position: relative;
-    border: 1px solid var(--glass-border);
+    border: 1px solid rgba(140, 0, 170, 0.3);
     box-shadow: 
-        0 25px 50px rgba(140, 0, 170, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        0 15px 35px rgba(0, 0, 0, 0.5),
+        0 5px 15px rgba(140, 0, 170, 0.2);
+    animation: modalContentSlide 0.25s ease-out;
+    margin: 0 auto; /* Центрирование */
 }
 
+/* Анимация только для контента */
+@keyframes modalContentSlide {
+    from { 
+        opacity: 0;
+        transform: translateY(-15px) scale(0.98);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Упрощаем градиентную рамку для производительности */
 .modal-content::before {
     content: '';
     position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color), transparent);
-    border-radius: 27px;
+    top: -1px;
+    left: -1px;
+    right: -1px;
+    bottom: -1px;
+    background: linear-gradient(45deg, 
+        rgba(140, 0, 170, 0.3), 
+        rgba(76, 175, 80, 0.2), 
+        transparent);
+    border-radius: 21px; /* +1 к основному радиусу */
     z-index: -1;
-    opacity: 0.2;
+    opacity: 0.5;
+    pointer-events: none;
 }
 
+/* Закрывающая кнопка */
 .close-btn {
     position: absolute;
     top: 15px;
     right: 20px;
-    font-size: 28px;
+    font-size: 26px;
     cursor: pointer;
     color: var(--text-secondary);
-    transition: all 0.3s ease;
-    width: 40px;
-    height: 40px;
+    transition: all 0.2s ease;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.08);
+    z-index: 2;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .close-btn:hover {
     color: white;
-    background: rgba(255, 107, 107, 0.3);
+    background: rgba(255, 107, 107, 0.25);
     transform: rotate(90deg);
+    border-color: rgba(255, 107, 107, 0.3);
+}
+
+/* Фикс для смещения скроллбара */
+body.modal-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+}
+
+/* Оптимизация для мобильных устройств */
+@media (max-width: 768px) {
+    .modal {
+        padding: 10px;
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+    }
+    
+    .modal-content {
+        padding: 25px 20px;
+        border-radius: 18px;
+        max-width: 95%;
+        margin: 10px auto;
+    }
+    
+    .close-btn {
+        top: 12px;
+        right: 15px;
+        width: 32px;
+        height: 32px;
+        font-size: 24px;
+    }
 }
 
 /* Модалка товара */
@@ -1125,4 +1197,332 @@ body::before {
     text-align: center;
     font-weight: 500;
     letter-spacing: 0.5px;
+}
+/* === СТИЛИ ДЛЯ РАЗДЕЛА ДОСТИЖЕНИЙ === */
+
+/* Анимация "перекати-поле" */
+.empty-icon-container {
+    margin: 1em auto;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-icon-container p {
+    margin-top: 20px;
+    font-size: 0.9em;
+    line-height: 1.4;
+    max-width: 300px;
+}
+
+.animation-container {
+    position: relative;
+    display: block;
+    text-align: center;
+    height: 100px;
+    width: 100px;
+    border-bottom: solid 2px var(--border-color);
+    overflow: hidden;
+}
+
+/* Шарик */
+.bounce {
+    display: inline-block;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    margin-left: -20px;
+    background-color: var(--accent-color);
+    border-radius: 50%;
+    animation: bounceAnim 1s cubic-bezier(.63,.09,.75,.46) infinite alternate,
+               spinAnim 3s linear infinite;
+}
+
+/* Камушки */
+.pebble1 {
+    position: absolute;
+    top: 95%;
+    background-color: var(--text-secondary);
+    width: 10px;
+    height: 10px;
+    border-radius: 20px 20px 0px 0px;
+    animation: pebblesAnim 1s linear infinite;
+}
+
+.pebble2 {
+    position: absolute;
+    top: 97%;
+    background-color: var(--text-secondary);
+    width: 5px;
+    height: 5px;
+    border-radius: 10px 10px 0px 0px;
+    animation: pebblesAnim 2s linear infinite;
+}
+
+.pebble3 {
+    position: absolute;
+    top: 98%;
+    background-color: var(--text-secondary);
+    width: 3px;
+    height: 3px;
+    border-radius: 20px 20px 0px 0px;
+    animation: pebblesAnim 3s linear infinite;
+}
+
+/* Ключевые кадры для анимаций */
+@keyframes bounceAnim {
+    0%, 10% { 
+        bottom: 50%; 
+    }
+    100% { 
+        bottom: 0%; 
+    }
+}
+
+@keyframes spinAnim {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pebblesAnim {
+    0% { 
+        right: -20%; 
+    }
+    100% { 
+        right: 110%; 
+    }
+}
+
+/* === СТИЛИ ДЛЯ РАЗДЕЛА ДОСТИЖЕНИЙ === */
+
+/* Анимация "перекати-поле" */
+.empty-icon-container {
+    margin: 1em auto;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-icon-container p {
+    margin-top: 20px;
+    font-size: 0.9em;
+    line-height: 1.4;
+    max-width: 300px;
+}
+
+.animation-container {
+    position: relative;
+    display: block;
+    text-align: center;
+    height: 100px;
+    width: 100px;
+    border-bottom: solid 2px var(--border-color);
+    overflow: hidden;
+}
+
+/* Шарик */
+.bounce {
+    display: inline-block;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    margin-left: -20px;
+    background-color: var(--accent-color);
+    border-radius: 50%;
+    animation: bounceAnim 1s cubic-bezier(.63,.09,.75,.46) infinite alternate,
+               spinAnim 3s linear infinite;
+}
+
+/* Камушки */
+.pebble1 {
+    position: absolute;
+    top: 95%;
+    background-color: var(--text-secondary);
+    width: 10px;
+    height: 10px;
+    border-radius: 20px 20px 0px 0px;
+    animation: pebblesAnim 1s linear infinite;
+}
+
+.pebble2 {
+    position: absolute;
+    top: 97%;
+    background-color: var(--text-secondary);
+    width: 5px;
+    height: 5px;
+    border-radius: 10px 10px 0px 0px;
+    animation: pebblesAnim 2s linear infinite;
+}
+
+.pebble3 {
+    position: absolute;
+    top: 98%;
+    background-color: var(--text-secondary);
+    width: 3px;
+    height: 3px;
+    border-radius: 20px 20px 0px 0px;
+    animation: pebblesAnim 3s linear infinite;
+}
+
+/* Ключевые кадры для анимаций */
+@keyframes bounceAnim {
+    0%, 10% { 
+        bottom: 50%; 
+    }
+    100% { 
+        bottom: 0%; 
+    }
+}
+
+@keyframes spinAnim {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pebblesAnim {
+    0% { 
+        right: -20%; 
+    }
+    100% { 
+        right: 110%; 
+    }
+}
+
+/* === СТИЛИ ДЛЯ АНИМАЦИИ ПЕРЕКАТИ-ПОЛЕ (ТОЛЬКО SVG) === */
+
+.empty-icon-container {
+    margin: 1em auto;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-icon-container p {
+    margin-top: 20px;
+    font-size: 0.9em;
+    line-height: 1.4;
+    max-width: 300px;
+}
+
+.animation-container {
+    position: relative;
+    display: block;
+    text-align: center;
+    height: 100px;
+    width: 100px;
+    border-bottom: solid 2px var(--border-color);
+    overflow: hidden;
+}
+
+/* Контейнер для SVG */
+.tumbleweed-svg-container {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 40px; /* Увеличиваем размер */
+    height: 40px; /* Увеличиваем размер */
+    transform: translateX(-50%);
+    animation: bounceAnim 1s cubic-bezier(.63,.09,.75,.46) infinite alternate,
+               spinAnim 3s linear infinite;
+}
+
+/* SVG иконка перекати-поле */
+.tumbleweed-svg {
+    width: 100%;
+    height: 100%;
+    color: #ffffff; /* Белый цвет */
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+/* Камушки */
+.pebble1 {
+    position: absolute;
+    top: 95%;
+    background-color: #cccccc; /* Светло-серый */
+    width: 10px;
+    height: 10px;
+    border-radius: 20px 20px 0px 0px;
+    animation: pebblesAnim 1s linear infinite;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.pebble2 {
+    position: absolute;
+    top: 97%;
+    background-color: #aaaaaa; /* Серый */
+    width: 5px;
+    height: 5px;
+    border-radius: 10px 10px 0px 0px;
+    animation: pebblesAnim 2s linear infinite;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.pebble3 {
+    position: absolute;
+    top: 98%;
+    background-color: #888888; /* Темно-серый */
+    width: 3px;
+    height: 3px;
+    border-radius: 20px 20px 0px 0px;
+    animation: pebblesAnim 3s linear infinite;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Ключевые кадры для анимаций */
+@keyframes bounceAnim {
+    0%, 10% { 
+        bottom: 50%; 
+        transform: translateX(-50%) scale(1);
+    }
+    50% {
+        transform: translateX(-50%) scale(1.05) rotate(5deg);
+    }
+    100% { 
+        bottom: 0%; 
+        transform: translateX(-50%) scale(1);
+    }
+}
+
+@keyframes spinAnim {
+    0% {
+        transform: translateX(-50%) rotate(0deg);
+    }
+    100% {
+        transform: translateX(-50%) rotate(360deg);
+    }
+}
+
+@keyframes pebblesAnim {
+    0% { 
+        right: -20%; 
+        opacity: 1;
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% { 
+        right: 110%; 
+        opacity: 0;
+    }
 }
