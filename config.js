@@ -171,7 +171,7 @@ window.SHOP_ITEMS = [
 // Список пользователей, у которых есть фото кружки
 window.MUG_ACHIEVERS = [
     { id: 3387, name: "Арсений Корогод", photo: "korogod.png" },
-    { id: 233, name: "Евгений Смирнов", photo: "mug_evgeny.jpg" }  
+    { id: 3631, name: "Елена Барынкина", photo: "barinkina.jpg" }  
 ];
 
 // Описание достижения
