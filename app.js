@@ -8,6 +8,9 @@ class GameLabApp {
         this.currentOperation = 'add'; // 'add' или 'deduct'
         this.currentResource = 'coins'; // 'coins', 'exp', 'score', 'hearts'
         this.loadAuthState();
+        
+        // Делегирование событий для динамических элементов
+        this.setupEventDelegation();
     }
 
     // Загружаем состояние авторизации из localStorage
@@ -21,21 +24,6 @@ class GameLabApp {
             }
         }
     }
-
-    // Тест уведомлений Bitrix24
-// async testBitrixNotifications() {
-//     if (!this.isNatalia()) {
-//         alert('Эта функция доступна только Наталье');
-//         return;
-//     }
-    
-//     if (window.NotificationsManager) {
-//         const notifications = new NotificationsManager();
-//         await notifications.sendTestNotification();
-//     } else {
-//         alert('❌ Модуль уведомлений не загружен');
-//     }
-// }
 
     // Сохраняем состояние авторизации
     saveAuthState() {
@@ -75,6 +63,31 @@ class GameLabApp {
         if (el) {
             el.style.display = 'none';
         }
+    }
+
+    // Делегирование событий для динамических элементов
+    setupEventDelegation() {
+        document.addEventListener('click', (e) => {
+            // Клик по карточке пользователя (коллеге)
+            const userItem = e.target.closest('.user-item');
+            if (userItem) {
+                const userId = userItem.getAttribute('data-user-id');
+                if (userId) {
+                    this.showUserModal(parseInt(userId));
+                }
+            }
+            
+            // Клик по кнопке закрытия модальных окон
+            if (e.target.classList.contains('close-btn')) {
+                this.closeAllModals();
+            }
+            
+            // Клик по фону модального окна
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+        });
     }
 
     showRulesTab(tab) {
@@ -134,7 +147,7 @@ class GameLabApp {
                 <h4>🏆 741-1825 EXP: Эксперт (Expert)</h4>
                 <ul><li>Привилегия: роль ментора, право голоса в улучшении процессов, доступ к премиум-каталогу призов.</li></ul>
                 <h4>👑 1826+ EXP: Легенда Aetos (Aetos Legend)</h4>
-                <ul><li>Достижение: 1826 EXP — это 5 лет безупречной работы в компании. Почетный статус: фото на "Аллее Славы" в офисе, право предлагать и давать имя внутренним проектам, именной бонус в день "Легенды".</li></ul>
+                <ul><li>Достижение: 1826 EXP — это 5 лет безупречной работы в компании (надбавка к окладу). Почетный статус: фото на "Аллее Славы" в офисе, право предлагать и давать имя внутренним проектам, именной бонус в день "Легенды".</li></ul>
             `;
         } else if (tab === 'hearts') {
             title.textContent = '❤️ КАК ПОЛУЧИТЬ СЕРДЕЧКИ (HEARTs)';
@@ -184,23 +197,27 @@ class GameLabApp {
                 this.loadColleaguesList(e.target.value);
             });
         }
+        
+        // Закрытие модальных окон по клавише ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeAllModals();
+            }
+        });
     }
 
     setupModalClose() {
         const modals = [
-            { id: 'user-modal', closeFn: () => this.closeUserModal() },
-            { id: 'item-modal', closeFn: () => this.closeItemModal() },
-            { id: 'coins-modal', closeFn: () => this.closeCoinsModal() },
-            { id: 'heart-modal', closeFn: () => this.closeHeartModal() },
-            { id: 'admin-modal', closeFn: () => this.closeAdminModal() }
+            { id: 'user-modal', closeFn: () => this.closeAllModals() },
+            { id: 'item-modal', closeFn: () => this.closeAllModals() },
+            { id: 'coins-modal', closeFn: () => this.closeAllModals() },
+            { id: 'heart-modal', closeFn: () => this.closeAllModals() },
+            { id: 'admin-modal', closeFn: () => this.closeAllModals() }
         ];
 
         modals.forEach(({ id, closeFn }) => {
             const modal = document.getElementById(id);
             if (modal) {
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) closeFn();
-                });
                 const closeBtn = modal.querySelector('.close-btn');
                 if (closeBtn) closeBtn.addEventListener('click', closeFn);
             }
@@ -446,8 +463,6 @@ class GameLabApp {
                         <button class="btn" onclick="app.showAddResourceModal('score')">➕ Звёзды</button>
                         <button class="btn" onclick="app.showAddResourceModal('hearts')">➕ Сердечки</button>
                         <button class="btn" onclick="window.ordersPanel?.show()">📦 Заказы</button>
-                        
-            </div>
                     </div>
                 `;
                 document.querySelector('.profile-info').appendChild(div);
@@ -520,103 +535,425 @@ class GameLabApp {
     }
 
     loadColleaguesList(searchTerm = '') {
-        const list = document.getElementById('colleagues-list');
-        if (!list) return;
-        list.innerHTML = '<div class="loading-text">Загрузка...</div>';
+    const list = document.getElementById('colleagues-list');
+    if (!list) return;
+    list.innerHTML = '<div class="loading-text">Загрузка...</div>';
 
-        setTimeout(() => {
-            const filtered = allUsers.filter(u => 
-                u.id !== currentUser?.id && 
-                u.name.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            
-            list.innerHTML = filtered.length
-                ? filtered.map(user => {
-                    const hasAvatar = !!user.avatar_url;
-                    return `
-                        <div class="user-item fade-in" data-user-id="${user.id}">
+    setTimeout(() => {
+        const filtered = allUsers.filter(u => 
+            u.id !== currentUser?.id && 
+            u.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        list.innerHTML = filtered.length
+            ? filtered.map(user => {
+                const hasAvatar = !!user.avatar_url;
+                const hasMug = window.MUG_ACHIEVERS && 
+                              Array.isArray(window.MUG_ACHIEVERS) &&
+                              window.MUG_ACHIEVERS.some(u => u.id === user.id);
+                
+                // Находим данные о кружке если есть
+                const mugData = hasMug ? window.MUG_ACHIEVERS.find(u => u.id === user.id) : null;
+                
+                return `
+                    <div class="user-item fade-in" data-user-id="${user.id}">
+                        <div class="user-avatar-container">
                             <div class="avatar ${hasAvatar ? '' : 'initials'}" 
                                  style="${hasAvatar ? `background-image: url('${user.avatar_url}?v=${Date.now()}')` : `background-color: ${user.avatar_color}`}">
                                 ${hasAvatar ? '' : user.avatar_initials}
                             </div>
-                            <div class="user-details">
-                                <div class="user-name">${user.name}</div>
-                                <div class="user-position">${user.position}</div>
+                            ${hasMug ? `
+                                <div class="mug-badge" title="Имеет фирменную кружку HDL">
+                                    <div class="mug-badge-icon">☕</div>
+                                    ${mugData?.photo ? `
+                                        <div class="mug-badge-preview" data-user-id="${user.id}">
+                                            <img src="./img/mugs/${mugData.photo}" 
+                                                 alt="Кружка ${user.name}"
+                                                 class="mug-preview-image"
+                                                 loading="lazy"
+                                                 onerror="this.style.display='none'">
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="user-details">
+                            <div class="user-name">
+                                ${user.name}
+                                ${hasMug ? '<span class="mug-indicator" title="Имеет фирменную кружку"> ☕</span>' : ''}
                             </div>
-                            <div class="user-stats">
-                                <div class="user-stat">
-                                    <div class="user-stat-value coins-color">${user.coins}</div>
-                                    <div class="user-stat-label">Bus‑коин</div>
-                                </div>
-                                <div class="user-stat">
-                                    <div class="user-stat-value exp-color">${user.exp}</div>
-                                    <div class="user-stat-label">Опыт</div>
-                                </div>
-                                <div class="user-stat">
-                                    <div class="user-stat-value score-color">${user.score}</div>
-                                    <div class="user-stat-label">Звёзды</div>
-                                </div>
-                                <div class="user-stat">
-                                    <div class="user-stat-value hearts-color">${user.hearts || 0}</div>
-                                    <div class="user-stat-label">Сердечки</div>
-                                </div>
+                            <div class="user-position">${user.position}</div>
+                        </div>
+                        <div class="user-stats">
+                            <div class="user-stat">
+                                <div class="user-stat-value coins-color">${user.coins}</div>
+                                <div class="user-stat-label">Bus‑коин</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="user-stat-value exp-color">${user.exp}</div>
+                                <div class="user-stat-label">Опыт</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="user-stat-value score-color">${user.score}</div>
+                                <div class="user-stat-label">Звёзды</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="user-stat-value hearts-color">${user.hearts || 0}</div>
+                                <div class="user-stat-label">Сердечки</div>
                             </div>
                         </div>
-                    `;
-                }).join('')
-                : '<div class="loading-text">Коллеги не найдены</div>';
+                    </div>
+                `;
+            }).join('')
+            : '<div class="loading-text">Коллеги не найдены</div>';
 
-            list.querySelectorAll('.user-item').forEach(item => {
-                item.addEventListener('click', (e) => {
-                    const userId = parseInt(e.currentTarget.dataset.userId);
-                    const user = allUsers.find(u => u.id === userId);
-                    if (user) this.openUserModal(user);
-                });
-            });
-        }, 300);
+        // Инициализируем превью кружек
+        this.initMugPreviews();
+    }, 50);
+}
+
+// Инициализация превью кружек
+initMugPreviews() {
+    const mugBadges = document.querySelectorAll('.mug-badge');
+    
+    mugBadges.forEach(badge => {
+        const preview = badge.querySelector('.mug-badge-preview');
+        if (!preview) return;
+        
+        // Показываем превью при наведении
+        badge.addEventListener('mouseenter', (e) => {
+            const rect = badge.getBoundingClientRect();
+            preview.style.display = 'block';
+            preview.style.left = `${rect.left}px`;
+            preview.style.top = `${rect.bottom + 5}px`;
+        });
+        
+        badge.addEventListener('mouseleave', () => {
+            preview.style.display = 'none';
+        });
+        
+        // Клик по превью тоже открывает модальное окно
+        preview.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const userId = preview.getAttribute('data-user-id');
+            if (userId) {
+                this.showUserModal(parseInt(userId));
+            }
+        });
+    });
+}
+
+    // Показать модальное окно с информацией о пользователе
+    showUserModal(userId) {
+    console.log('Показать модальное окно для пользователя ID:', userId);
+    
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) {
+        console.error('Пользователь не найден');
+        return;
     }
-
-    openUserModal(user) {
-        this.setElementText('modal-full-name', user.name);
-        this.setElementText('modal-position', user.position);
-        this.setElementText('modal-coins', user.coins);
-        this.setElementText('modal-exp', user.exp);
-        this.setElementText('modal-score', user.score);
-        this.setElementText('modal-hearts', user.hearts || 0);
-        this.updateAvatar('modal-avatar', user);
-        this.loadUserAchievements(user);
-        document.getElementById('user-modal').classList.add('active');
-        document.body.style.overflow = 'hidden';
+    
+    // Закрываем все другие модальные окна
+    this.closeAllModals();
+    
+    const modal = document.getElementById('user-modal');
+    if (!modal) {
+        console.error('Модальное окно не найдено');
+        return;
     }
+    
+    // Заполняем данные сразу
+    this.setElementText('modal-full-name', user.name);
+    this.setElementText('modal-position', user.position);
+    this.setElementText('modal-coins', user.coins);
+    this.setElementText('modal-exp', user.exp);
+    this.setElementText('modal-score', user.score);
+    this.setElementText('modal-hearts', user.hearts || 0);
+    
+    // Быстрая загрузка аватара без задержек
+    this.updateAvatarFast('modal-avatar', user);
+    
+    // Временно показываем заглушку для достижений
+    const achievementsContainer = document.getElementById('modal-achievements');
+    if (achievementsContainer) {
+        achievementsContainer.innerHTML = '<div class="loading-text">Загрузка достижений...</div>';
+    }
+    
+    // Показываем модальное окно БЫСТРО
+    modal.style.display = 'block';
+    document.body.classList.add('modal-open');
+    
+    // Загружаем достижения в фоне
+    setTimeout(() => {
+        this.loadUserAchievements(userId);
+    }, 10);
+}
 
-    closeUserModal() {
-        const modal = document.getElementById('user-modal');
-        if (modal) {
-            modal.classList.remove('active');
-            document.body.style.overflow = '';
+// Оптимизированный метод для быстрой загрузки аватаров
+updateAvatarFast(elementId, user) {
+    const avatar = document.getElementById(elementId);
+    if (!avatar) return;
+
+    avatar.style.backgroundImage = '';
+    avatar.textContent = '';
+    avatar.classList.remove('initials');
+
+    if (user.avatar_url) {
+        // Используем placeholder пока грузится изображение
+        this.showAvatarInitials(avatar, user);
+        
+        // Загружаем в фоне
+        const img = new Image();
+        img.onload = () => {
+            if (img.width > 1 && img.height > 1) {
+                avatar.style.backgroundImage = `url('${user.avatar_url}')`;
+                avatar.textContent = '';
+                avatar.classList.remove('initials');
+            }
+        };
+        img.onerror = () => {
+            // Оставляем инициалы если изображение не загрузилось
+        };
+        img.src = user.avatar_url;
+    } else {
+        this.showAvatarInitials(avatar, user);
+    }
+}
+
+// Обновляем метод для загрузки аватаров в списке коллег
+loadColleaguesList(searchTerm = '') {
+    const list = document.getElementById('colleagues-list');
+    if (!list) return;
+    list.innerHTML = '<div class="loading-text">Загрузка...</div>';
+
+    setTimeout(() => {
+        const filtered = allUsers.filter(u => 
+            u.id !== currentUser?.id && 
+            u.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        list.innerHTML = filtered.length
+            ? filtered.map(user => {
+                // Оптимизация: показываем инициалы сразу, изображение грузим в фоне
+                const initials = user.avatar_initials || user.name.charAt(0);
+                return `
+                    <div class="user-item fade-in" data-user-id="${user.id}">
+                        <div class="avatar initials" 
+                             style="background-color: ${user.avatar_color};"
+                             data-avatar-url="${user.avatar_url || ''}">
+                            ${initials}
+                        </div>
+                        <div class="user-details">
+                            <div class="user-name">${user.name}</div>
+                            <div class="user-position">${user.position}</div>
+                        </div>
+                        <div class="user-stats">
+                            <div class="user-stat">
+                                <div class="user-stat-value coins-color">${user.coins}</div>
+                                <div class="user-stat-label">Bus‑коин</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="user-stat-value exp-color">${user.exp}</div>
+                                <div class="user-stat-label">Опыт</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="user-stat-value score-color">${user.score}</div>
+                                <div class="user-stat-label">Звёзды</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="user-stat-value hearts-color">${user.hearts || 0}</div>
+                                <div class="user-stat-label">Сердечки</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('')
+            : '<div class="loading-text">Коллеги не найдены</div>';
+
+        // Загружаем аватары в фоне
+        setTimeout(() => {
+            this.loadAvatarsInBackground();
+        }, 100);
+    }, 50); // Уменьшили задержку
+}
+
+// Загрузка аватаров в фоне для списка коллег
+loadAvatarsInBackground() {
+    const avatarElements = document.querySelectorAll('.avatar[data-avatar-url]');
+    avatarElements.forEach(avatarEl => {
+        const avatarUrl = avatarEl.getAttribute('data-avatar-url');
+        if (avatarUrl) {
+            const img = new Image();
+            img.onload = () => {
+                if (img.width > 1 && img.height > 1) {
+                    avatarEl.style.backgroundImage = `url('${avatarUrl}')`;
+                    avatarEl.textContent = '';
+                    avatarEl.classList.remove('initials');
+                }
+            };
+            img.src = avatarUrl;
         }
+    });
+}
+
+// Обновляем метод закрытия модальных окон
+closeAllModals() {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        modal.style.display = 'none';
+    });
+    document.body.classList.remove('modal-open');
+}
+
+    // Загрузить достижения пользователя для модального окна
+    loadUserAchievements(userId) {
+    const container = document.getElementById('modal-achievements');
+    if (!container) return;
+    
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) {
+        container.innerHTML = '<div class="loading-text">Пользователь не найден</div>';
+        return;
     }
-
-    loadUserAchievements(user) {
-        const el = document.getElementById('modal-achievements');
-        if (!el) return;
-
-        const achs = [
-            { icon: '🏆', name: 'Новичок', progress: 100 },
-            { icon: '⭐', name: 'Активный', progress: Math.min(user.coins / 10, 100) },
-            { icon: '🚀', name: 'Эксперт', progress: Math.min(user.exp / 50, 100) },
-            { icon: '💼', name: 'Профессионал', progress: Math.min(user.score * 5, 100) }
-        ];
-
-        el.innerHTML = achs.map(a => `
-            <div class="achievement-badge">
-                <div class="achievement-icon">${a.icon}</div>
-                <div class="achievement-name">${a.name}</div>
-                <div class="achievement-progress">
-                    <div class="achievement-progress-bar" style="width: ${a.progress}%"></div>
+    
+    const hasMug = window.MUG_ACHIEVERS && 
+                  Array.isArray(window.MUG_ACHIEVERS) &&
+                  window.MUG_ACHIEVERS.some(u => u.id === userId);
+    
+    if (hasMug) {
+        const mugUser = window.MUG_ACHIEVERS.find(u => u.id === userId);
+        
+        // Используем простой HTML без сложных inline обработчиков
+        let photoHTML = '';
+        
+        if (mugUser?.photo) {
+            photoHTML = `
+                <div class="mug-photo-container" id="mug-photo-${userId}">
+                    <img src="./img/mugs/${mugUser.photo}" 
+                         alt="Фирменная кружка ${mugUser.name}" 
+                         class="mug-photo"
+                         loading="lazy">
+                </div>
+            `;
+        } else {
+            photoHTML = `
+                <div class="mug-photo-container fallback">
+                    <div style="font-size:32px;opacity:0.8;">☕</div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = `
+            <div class="achievements-grid">
+                <div class="achievement-item mug-achievement">
+                    <div class="achievement-icon">${window.MUG_ACHIEVEMENT?.icon || '☕'}</div>
+                    <div class="achievement-content">
+                        <h4>${window.MUG_ACHIEVEMENT?.name || 'Кружка HDL'}</h4>
+                        <p>${window.MUG_ACHIEVEMENT?.description || 'Используй фирменную кружку на рабочем месте и получи 2 Bus‑коина!'}</p>
+                        <small>Владелец: ${mugUser?.name || user.name}</small>
+                    </div>
+                    ${photoHTML}
                 </div>
             </div>
-        `).join('');
+        `;
+        
+        // Добавляем обработку ошибок загрузки изображения
+        if (mugUser?.photo) {
+            const img = container.querySelector('.mug-photo');
+            const photoContainer = container.querySelector('.mug-photo-container');
+            
+            if (img && photoContainer) {
+                // Проверяем, загрузилось ли изображение
+                setTimeout(() => {
+                    if (img.complete) {
+                        if (img.naturalWidth === 0) {
+                            // Ошибка загрузки
+                            photoContainer.classList.add('fallback');
+                            photoContainer.innerHTML = '<div style="font-size:32px;opacity:0.8;">☕</div>';
+                        }
+                    }
+                }, 1000);
+            }
+        }
+        
+    } else {
+        container.innerHTML = this.createTumbleweedAnimation();
+        setTimeout(() => this.initTumbleweedAnimation(), 100);
+    }
+}
+
+// Метод для создания анимации "перекати-поле" (переиспользуем из achievements.js)
+createTumbleweedAnimation() {
+    return `
+        <div class="empty-icon-container">
+            <div class="animation-container">
+                <div class="tumbleweed-svg-container">
+                    <svg class="tumbleweed-svg" version="1.1" viewBox="0 0 512 512">
+                        <path fill="currentColor" d="M465.526,284.255c1.805-11.117,2.758-22.515,2.758-34.134c0-11.96-1.015-23.747-2.956-35.27l40.082-40.082l-21.213-21.214 l-27.476,27.475c-9.208-26.714-23.645-51.245-42.295-72.188v-55.03h-30v27.253c-17.457-13.282-37.155-23.994-58.632-31.469 l-9.861,28.333c73.182,25.469,122.351,94.667,122.351,172.192c0,73.627-43.881,137.193-106.861,165.934 c2.54-3.704,4.995-7.604,7.349-11.72c19.906-34.807,30.87-80.764,30.87-129.403c0-5.66-0.157-11.295-0.457-16.893l37.582-37.582 l-21.213-21.213l-20.804,20.804c-4.361-23.993-11.549-46.415-21.273-65.737l-26.799,13.486 c14.809,29.425,22.964,67.473,22.964,107.133c0,22.083-2.468,43.432-7.164,63.075l-19.952-19.952l-21.213,21.214l30.847,30.847 c-2.826,6.811-5.971,13.277-9.43,19.326c-11.985,20.955-26.43,34.782-41.73,40.28V208.786l37.125-37.125l-21.213-21.213 L271,166.361V122.36h-30v133.527l-15.912-15.912l-21.213,21.213L241,298.312V429.72c-15.3-5.498-29.745-19.325-41.729-40.279 c-3.46-6.05-6.604-12.516-9.43-19.326l30.847-30.847l-21.213-21.213l-19.952,19.952c-4.696-19.643-7.164-40.992-7.164-63.075 c0-39.661,8.155-77.708,22.963-107.133l-26.798-13.486c-9.723,19.322-16.912,41.743-21.273,65.737l-20.805-20.805l-21.213,21.213 l37.583,37.582c-0.3,5.597-0.457,11.233-0.457,16.892c0,48.64,10.963,94.596,30.871,129.403c2.354,4.116,4.81,8.016,7.349,11.72 c-62.981-28.74-106.862-92.307-106.862-165.934c0-77.524,49.169-146.723,122.35-172.192l-9.86-28.333 c-21.477,7.474-41.175,18.186-58.632,31.468V53.812h-30v55.031c-18.65,20.943-33.087,45.474-42.295,72.188l-27.475-27.475 L6.591,174.769l40.082,40.082c-1.942,11.524-2.957,23.311-2.957,35.271c0,11.618,0.953,23.017,2.758,34.134H0v30h53.627 c9.729,30.629,26.232,58.265,47.742,81.146l-30.932,30.931l21.213,21.213l31.767-31.766 c36.355,29.155,82.464,46.625,132.583,46.625s96.228-17.47,132.583-46.625l31.766,31.766l21.213-21.213l-30.931-30.931 c21.51-22.882,38.013-50.517,47.742-81.146H512v-0.001v-30H465.526z"/>
+                    </svg>
+                </div>
+                <div class="pebble1"></div>
+                <div class="pebble2"></div>
+                <div class="pebble3"></div>
+            </div>
+            <p>Пока нет достижений.<br>${window.MUG_ACHIEVEMENT?.description || 'Используй фирменную кружку и получи 2 Bus‑коина!'}</p>
+        </div>
+    `;
+}
+
+// Инициализация анимации перекати-поле
+initTumbleweedAnimation() {
+    const container = document.querySelector('#modal-achievements .animation-container');
+    if (!container) return;
+
+    const elements = container.querySelectorAll('.tumbleweed-svg-container, .pebble1, .pebble2, .pebble3');
+    elements.forEach(el => {
+        // Принудительный reflow для перезапуска анимации
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = '';
+    });
+}
+
+    // Закрыть все модальные окна
+    closeAllModals() {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    });
+    
+    // ВОССТАНАВЛИВАЕМ СКРОЛЛ
+    document.body.style.overflow = '';
+    document.body.classList.remove('modal-open');
+    
+    // Убираем фиксированное позиционирование если оно было добавлено
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+}
+
+    loadAchievements() {
+        console.log('🏆 Загрузка достижений для пользователя:', currentUser?.id);
+        const container = document.getElementById('achievements-list');
+        
+        if (!container) {
+            console.error('❌ Контейнер достижений не найден');
+            return;
+        }
+
+        if (!currentUser) {
+            container.innerHTML = '<div class="loading-text">Войдите для просмотра достижений</div>';
+            return;
+        }
+
+        // Инициализируем менеджер достижений
+        if (!window.achievementsManager) {
+            window.achievementsManager = new AchievementsManager();
+        }
+
+        // Загружаем достижения, передавая ID пользователя
+        window.achievementsManager.loadAchievements(currentUser.id);
     }
 
     showSection(sectionId) {
@@ -648,105 +985,88 @@ class GameLabApp {
     }
 
     loadShopItems() {
-    const container = document.getElementById('shop-items');
-    if (!container) return;
-
-    container.innerHTML = window.SHOP_ITEMS.map(item => `
-        <div class="shop-item fade-in" data-item-id="${item.id}">
-            <img src="./img/${item.image || 'default.png'}" alt="${item.name}" 
-                 class="shop-item-image" 
-                 onclick="app.openItemModal(${item.id})"
-                 style="cursor: pointer;">
-            <h4>${item.name}</h4>
-            <div class="shop-item-price">
-                <img src="./img/coin.svg" alt="Coins" style="width: 16px; height: 16px; margin-right: 5px;">
-                ${item.price} Bus‑коин
-            </div>
-            <button class="btn" onclick="app.buyItemWithConfirmation(${item.id})"
-                    ${currentUser?.coins >= item.price ? '' : 'disabled'}
-                    style="${currentUser?.coins >= item.price ? 'background: #4CAF50; color: white;' : ''}">
-                🛒 Купить
-            </button>
-        </div>
-    `).join('');
-}
-
-// Отдельный метод для покупки с подтверждением
-buyItemWithConfirmation(itemId) {
-    const item = window.SHOP_ITEMS.find(i => i.id === itemId);
-    if (!item) return;
-    
-    const modalId = 'quick-buy-modal';
-    const oldModal = document.getElementById(modalId);
-    if (oldModal) oldModal.remove();
-    
-    const html = `
-    <div id="${modalId}" class="modal" style="display: block;">
-        <div class="modal-content" style="max-width: 500px;">
-            <span class="close-btn" onclick="document.getElementById('${modalId}').remove()">&times;</span>
-            
-            <h3 style="margin-bottom: 15px;">🛒 Быстрая покупка</h3>
-            
-            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-                <img src="./img/${item.image || 'default.png'}" alt="${item.name}" 
-                     style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
-                <div>
-                    <h4 style="margin: 0 0 5px 0;">${item.name}</h4>
-                    <div style="color: #666; font-size: 14px;">${item.description ? item.description.substring(0, 80) + '...' : ''}</div>
-                </div>
-            </div>
-            
-            <div style="background: #99999993; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <span>Цена:</span>
-                    <span style="font-weight: bold; color: #FFD700;">
-                        <img src="./img/coin.svg" alt="Coins" style="width: 16px; height: 16px; vertical-align: middle;">
-                        ${item.price} Bus‑коинов
-                    </span>
-                </div>
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Ваш баланс:</span>
-                    <span style="font-weight: bold; color: ${currentUser?.coins >= item.price ? '#4CAF50' : '#f44336'}">
-                        ${currentUser?.coins || 0} коинов
-                    </span>
-                </div>
-                ${currentUser?.coins < item.price ? 
-                    '<div style="color: #f44336; margin-top: 10px; font-size: 13px;">❌ Недостаточно коинов для покупки</div>' : 
-                    ''}
-            </div>
-            
-            <div style="display: flex; gap: 10px;">
-                <button class="btn" onclick="document.getElementById('${modalId}').remove()" 
-                        style="flex: 1; background: #ccc;">
-                    Отмена
-                </button>
-                <button class="btn" onclick="app.buyItem(${item.id}); document.getElementById('${modalId}').remove()" 
-                        style="flex: 1; background: #4CAF50; color: white;"
-                        ${currentUser?.coins >= item.price ? '' : 'disabled'}>
-                    Подтвердить покупку
-                </button>
-            </div>
-        </div>
-    </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', html);
-}
-
-    loadAchievements() {
-        const container = document.getElementById('achievements-list');
+        const container = document.getElementById('shop-items');
         if (!container) return;
 
-        container.innerHTML = window.ACHIEVEMENTS.map(a => `
-            <div class="achievement-item fade-in">
-                <div style="display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="font-size: 1.5em; margin-right: 12px;">${a.icon}</div>
-                    <div>
-                        <div style="font-weight: bold;">${a.name}</div>
-                        <div style="color: #666; font-size: 0.9em;">${a.description}</div>
-                    </div>
+        container.innerHTML = window.SHOP_ITEMS.map(item => `
+            <div class="shop-item fade-in" data-item-id="${item.id}">
+                <img src="./img/${item.image || 'default.png'}" alt="${item.name}" 
+                     class="shop-item-image" 
+                     onclick="app.openItemModal(${item.id})"
+                     style="cursor: pointer;">
+                <h4>${item.name}</h4>
+                <div class="shop-item-price">
+                    <img src="./img/coin.svg" alt="Coins" style="width: 16px; height: 16px; margin-right: 5px;">
+                    ${item.price} Bus‑коин
                 </div>
+                <button class="btn" onclick="app.buyItemWithConfirmation(${item.id})"
+                        ${currentUser?.coins >= item.price ? '' : 'disabled'}
+                        style="${currentUser?.coins >= item.price ? 'background: #4CAF50; color: white;' : ''}">
+                    🛒 Купить
+                </button>
             </div>
         `).join('');
+    }
+
+    // Отдельный метод для покупки с подтверждением
+    buyItemWithConfirmation(itemId) {
+        const item = window.SHOP_ITEMS.find(i => i.id === itemId);
+        if (!item) return;
+        
+        const modalId = 'quick-buy-modal';
+        const oldModal = document.getElementById(modalId);
+        if (oldModal) oldModal.remove();
+        
+        const html = `
+        <div id="${modalId}" class="modal" style="display: block;">
+            <div class="modal-content" style="max-width: 500px;">
+                <span class="close-btn" onclick="document.getElementById('${modalId}').remove()">&times;</span>
+                
+                <h3 style="margin-bottom: 15px;">🛒 Быстрая покупка</h3>
+                
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                    <img src="./img/${item.image || 'default.png'}" alt="${item.name}" 
+                         style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
+                    <div>
+                        <h4 style="margin: 0 0 5px 0;">${item.name}</h4>
+                        <div style="color: #666; font-size: 14px;">${item.description ? item.description.substring(0, 80) + '...' : ''}</div>
+                    </div>
+                </div>
+                
+                <div style="background: #99999993; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span>Цена:</span>
+                        <span style="font-weight: bold; color: #FFD700;">
+                            <img src="./img/coin.svg" alt="Coins" style="width: 16px; height: 16px; vertical-align: middle;">
+                            ${item.price} Bus‑коинов
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Ваш баланс:</span>
+                        <span style="font-weight: bold; color: ${currentUser?.coins >= item.price ? '#4CAF50' : '#f44336'}">
+                            ${currentUser?.coins || 0} коинов
+                        </span>
+                    </div>
+                    ${currentUser?.coins < item.price ? 
+                        '<div style="color: #f44336; margin-top: 10px; font-size: 13px;">❌ Недостаточно коинов для покупки</div>' : 
+                        ''}
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn" onclick="document.getElementById('${modalId}').remove()" 
+                            style="flex: 1; background: #ccc;">
+                        Отмена
+                    </button>
+                    <button class="btn" onclick="app.buyItem(${item.id}); document.getElementById('${modalId}').remove()" 
+                            style="flex: 1; background: #4CAF50; color: white;"
+                            ${currentUser?.coins >= item.price ? '' : 'disabled'}>
+                        Подтвердить покупку
+                    </button>
+                </div>
+            </div>
+        </div>`;
+        
+        document.body.insertAdjacentHTML('beforeend', html);
     }
 
     openItemModal(itemId) {
@@ -763,174 +1083,165 @@ buyItemWithConfirmation(itemId) {
         if (buyBtn) {
             buyBtn.onclick = () => {
                 this.buyItem(itemId);
-                this.closeItemModal();
+                this.closeAllModals();
             };
             buyBtn.disabled = !currentUser || currentUser.coins < item.price;
         }
 
-        document.getElementById('item-modal').classList.add('active');
+        document.getElementById('item-modal').style.display = 'block';
         document.body.style.overflow = 'hidden';
     }
 
-    closeItemModal() {
-        const modal = document.getElementById('item-modal');
-        if (modal) {
-            modal.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-    }
-
     async buyItem(itemId) {
-    const item = window.SHOP_ITEMS.find(i => i.id === itemId);
-    if (!item || !currentUser) {
-        alert('❌ Товар не найден');
-        return;
-    }
-
-    if (currentUser.coins < item.price) {
-        alert('❌ Недостаточно Bus‑коинов');
-        return;
-    }
-
-    // Подтверждение покупки
-    const confirmPurchase = confirm(`Вы уверены, что хотите купить "${item.name}" за ${item.price} Bus‑коинов?\n\nВаш баланс: ${currentUser.coins} коинов\nПосле покупки: ${currentUser.coins - item.price} коинов`);
-    
-    if (!confirmPurchase) {
-        return;
-    }
-
-    try {
-        // 1. Обновляем баланс пользователя
-        const { error: updateError } = await window.supabase
-            .from('users')
-            .update({ coins: currentUser.coins - item.price })
-            .eq('id', currentUser.id);
-
-        if (updateError) throw updateError;
-
-        // 2. Создаем заказ в базе
-        const { data: orderData, error: orderError } = await window.supabase
-            .from('orders')
-            .insert({
-                user_id: currentUser.id,
-                user_name: currentUser.name,
-                item_id: item.id,
-                item_name: item.name,
-                item_price: item.price,
-                status: 'pending'
-            })
-            .select()
-            .single();
-
-        if (orderError) throw orderError;
-
-        // 3. Записываем транзакцию покупки
-        await window.supabase
-            .from('transactions')
-            .insert({
-                user_id: currentUser.id,
-                admin_id: currentUser.id,
-                action: 'purchase',
-                amount: -item.price,
-                resource: 'coins',
-                comment: `Покупка товара: ${item.name}`
-            });
-
-        // 4. Отправляем уведомление (если покупатель не админ)
-        if (!this.isNatalia()) {
-    try {
-        if (window.NotificationsManager) {
-            const notificationsManager = new NotificationsManager();
-            // Используем новый метод для уведомления о покупке
-            await notificationsManager.notifyAboutPurchase(orderData);
+        const item = window.SHOP_ITEMS.find(i => i.id === itemId);
+        if (!item || !currentUser) {
+            alert('❌ Товар не найден');
+            return;
         }
-    } catch (notificationError) {
-        console.warn('⚠️ Не удалось отправить уведомление:', notificationError);
+
+        if (currentUser.coins < item.price) {
+            alert('❌ Недостаточно Bus‑коинов');
+            return;
+        }
+
+        // Подтверждение покупки
+        const confirmPurchase = confirm(`Вы уверены, что хотите купить "${item.name}" за ${item.price} Bus‑коинов?\n\nВаш баланс: ${currentUser.coins} коинов\nПосле покупки: ${currentUser.coins - item.price} коинов`);
+        
+        if (!confirmPurchase) {
+            return;
+        }
+
+        try {
+            // 1. Обновляем баланс пользователя
+            const { error: updateError } = await window.supabase
+                .from('users')
+                .update({ coins: currentUser.coins - item.price })
+                .eq('id', currentUser.id);
+
+            if (updateError) throw updateError;
+
+            // 2. Создаем заказ в базе
+            const { data: orderData, error: orderError } = await window.supabase
+                .from('orders')
+                .insert({
+                    user_id: currentUser.id,
+                    user_name: currentUser.name,
+                    item_id: item.id,
+                    item_name: item.name,
+                    item_price: item.price,
+                    status: 'pending'
+                })
+                .select()
+                .single();
+
+            if (orderError) throw orderError;
+
+            // 3. Записываем транзакцию покупки
+            await window.supabase
+                .from('transactions')
+                .insert({
+                    user_id: currentUser.id,
+                    admin_id: currentUser.id,
+                    action: 'purchase',
+                    amount: -item.price,
+                    resource: 'coins',
+                    comment: `Покупка товара: ${item.name}`
+                });
+
+            // 4. Отправляем уведомление (если покупатель не админ)
+            if (!this.isNatalia()) {
+                try {
+                    if (window.NotificationsManager) {
+                        const notificationsManager = new NotificationsManager();
+                        await notificationsManager.notifyAboutPurchase(orderData);
+                    }
+                } catch (notificationError) {
+                    console.warn('⚠️ Не удалось отправить уведомление:', notificationError);
+                }
+            }
+
+            // 5. Обновляем UI
+            currentUser.coins -= item.price;
+            this.saveAuthState();
+            this.updateProfile();
+            this.loadShopItems();
+
+            // 6. Показываем красивое сообщение о покупке
+            this.showPurchaseSuccessModal(item, orderData);
+
+        } catch (error) {
+            console.error('❌ Ошибка покупки:', error);
+            alert('❌ Ошибка покупки. Пожалуйста, попробуйте еще раз.');
+        }
     }
-}
 
-        // 5. Обновляем UI
-        currentUser.coins -= item.price;
-        this.saveAuthState();
-        this.updateProfile();
-        this.loadShopItems();
-
-        // 6. Показываем красивое сообщение о покупке
-        this.showPurchaseSuccessModal(item, orderData);
-
-    } catch (error) {
-        console.error('❌ Ошибка покупки:', error);
-        alert('❌ Ошибка покупки. Пожалуйста, попробуйте еще раз.');
-    }
-}
-
-// Показать модальное окно об успешной покупке
-showPurchaseSuccessModal(item, order) {
-    const modalId = 'purchase-success-modal';
-    
-    // Удаляем старую модалку если есть
-    const oldModal = document.getElementById(modalId);
-    if (oldModal) oldModal.remove();
-    
-    const html = `
-    <div id="${modalId}" class="modal" style="display: block;">
-        <div class="modal-content" style="max-width: 500px; text-align: center;">
-            <div style="font-size: 3em; margin-bottom: 20px;">🎉</div>
-            <h3 style="color: #4CAF50; margin-bottom: 15px;">Покупка успешно завершена!</h3>
-            
-            <div style="background: #f9f9f9; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <h4 style="margin: 0 0 10px 0;">${item.name}</h4>
-                <div style="color: #666; margin-bottom: 10px;">${item.description ? item.description.substring(0, 100) + '...' : ''}</div>
-                <div style="display: flex; justify-content: center; gap: 20px; margin-top: 15px;">
-                    <div>
-                        <div style="font-size: 12px; color: #666;">Стоимость</div>
-                        <div style="font-weight: bold; color: #FFD700;">
-                            <img src="./img/coin.svg" alt="Coins" style="width: 16px; height: 16px; vertical-align: middle;">
-                            ${item.price} Bus‑коинов
+    // Показать модальное окно об успешной покупке
+    showPurchaseSuccessModal(item, order) {
+        const modalId = 'purchase-success-modal';
+        
+        // Удаляем старую модалку если есть
+        const oldModal = document.getElementById(modalId);
+        if (oldModal) oldModal.remove();
+        
+        const html = `
+        <div id="${modalId}" class="modal" style="display: block;">
+            <div class="modal-content" style="max-width: 500px; text-align: center;">
+                <div style="font-size: 3em; margin-bottom: 20px;">🎉</div>
+                <h3 style="color: #4CAF50; margin-bottom: 15px;">Покупка успешно завершена!</h3>
+                
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px 0;">${item.name}</h4>
+                    <div style="color: #666; margin-bottom: 10px;">${item.description ? item.description.substring(0, 100) + '...' : ''}</div>
+                    <div style="display: flex; justify-content: center; gap: 20px; margin-top: 15px;">
+                        <div>
+                            <div style="font-size: 12px; color: #666;">Стоимость</div>
+                            <div style="font-weight: bold; color: #FFD700;">
+                                <img src="./img/coin.svg" alt="Coins" style="width: 16px; height: 16px; vertical-align: middle;">
+                                ${item.price} Bus‑коинов
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: #666;">Номер заказа</div>
+                            <div style="font-weight: bold; color: #8C00AA;">#${order.id}</div>
                         </div>
                     </div>
-                    <div>
-                        <div style="font-size: 12px; color: #666;">Номер заказа</div>
-                        <div style="font-weight: bold; color: #8C00AA;">#${order.id}</div>
+                </div>
+                
+                <div style="background: #e8f5e8; padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4CAF50;">
+                    <div style="font-weight: bold; margin-bottom: 5px;">📦 Что дальше?</div>
+                    <div style="font-size: 14px; color: #555;">
+                        1. Заказ передан ответственному сотруднику<br>
+                        2. Вы получите уведомление о готовности<br>
+                        3. Забрать товар можно у Натальи Сюр
                     </div>
                 </div>
-            </div>
-            
-            <div style="background: #e8f5e8; padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4CAF50;">
-                <div style="font-weight: bold; margin-bottom: 5px;">📦 Что дальше?</div>
-                <div style="font-size: 14px; color: #555;">
-                    1. Заказ передан ответственному сотруднику<br>
-                    2. Вы получите уведомление о готовности<br>
-                    3. Забрать товар можно у Натальи Сюр
+                
+                <div style="color: #666; font-size: 13px; margin-bottom: 20px;">
+                    Ваш баланс обновлен. Заказ добавлен в историю.
                 </div>
+                
+                <button class="btn" onclick="document.getElementById('${modalId}').remove()" 
+                        style="background: #4CAF50; color: white; width: 100%;">
+                    Понятно, закрыть
+                </button>
             </div>
-            
-            <div style="color: #666; font-size: 13px; margin-bottom: 20px;">
-                Ваш баланс обновлен. Заказ добавлен в историю.
-            </div>
-            
-            <button class="btn" onclick="document.getElementById('${modalId}').remove()" 
-                    style="background: #4CAF50; color: white; width: 100%;">
-                Понятно, закрыть
-            </button>
-        </div>
-    </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', html);
-    
-    // Автоматическое закрытие через 10 секунд
-    setTimeout(() => {
-        const modal = document.getElementById(modalId);
-        if (modal) modal.remove();
-    }, 10000);
-}
+        </div>`;
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+        // Автоматическое закрытие через 10 секунд
+        setTimeout(() => {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.remove();
+        }, 10000);
+    }
 
     showAddCoinsModal() {
         document.getElementById('coins-modal-title').textContent = 'Добавить Bus‑коины';
         document.getElementById('coins-modal-action-text').textContent = 'Добавить';
         this.currentOperation = 'add';
         this.setupCoinsUserList();
-        document.getElementById('coins-modal').classList.add('active');
+        document.getElementById('coins-modal').style.display = 'block';
         document.body.style.overflow = 'hidden';
     }
 
@@ -939,21 +1250,8 @@ showPurchaseSuccessModal(item, order) {
         document.getElementById('coins-modal-action-text').textContent = 'Списать';
         this.currentOperation = 'deduct';
         this.setupCoinsUserList();
-        document.getElementById('coins-modal').classList.add('active');
+        document.getElementById('coins-modal').style.display = 'block';
         document.body.style.overflow = 'hidden';
-    }
-
-    closeCoinsModal() {
-        const modal = document.getElementById('coins-modal');
-        if (modal) {
-            modal.classList.remove('active');
-            document.body.style.overflow = '';
-
-            const userSearch = document.getElementById('coins-user-search');
-            const amountInput = document.getElementById('coins-amount');
-            if (userSearch) userSearch.value = '';
-            if (amountInput) amountInput.value = '';
-        }
     }
 
     setupCoinsUserList() {
@@ -1053,7 +1351,7 @@ showPurchaseSuccessModal(item, order) {
         this.loadColleaguesList();
         this.loadGlobalRating();
 
-        this.closeCoinsModal();
+        this.closeAllModals();
         const action = this.currentOperation === 'add' ? 'добавлено' : 'списано';
         alert(`✅ ${amount} Bus‑коинов ${action} ${targetName}`);
     }
@@ -1070,15 +1368,8 @@ showPurchaseSuccessModal(item, order) {
         document.getElementById('admin-modal-title').textContent = titles[resource];
         document.getElementById('admin-modal-action-text').textContent = 'Добавить';
         this.setupAdminUserList();
-        document.getElementById('admin-modal').classList.add('active');
+        document.getElementById('admin-modal').style.display = 'block';
         document.body.style.overflow = 'hidden';
-    }
-
-    closeAdminModal() {
-        document.getElementById('admin-modal').classList.remove('active');
-        document.body.style.overflow = '';
-        document.getElementById('admin-user-search').value = '';
-        document.getElementById('admin-amount').value = '';
     }
 
     setupAdminUserList() {
@@ -1170,7 +1461,7 @@ showPurchaseSuccessModal(item, order) {
         this.loadColleaguesList();
         this.loadGlobalRating();
 
-        this.closeAdminModal();
+        this.closeAllModals();
         alert(`✅ ${amount} ${label} начислено ${targetName}`);
     }
 
@@ -1327,18 +1618,8 @@ showPurchaseSuccessModal(item, order) {
         }
         
         this.setupHeartRecipientList();
-        document.getElementById('heart-modal').classList.add('active');
+        document.getElementById('heart-modal').style.display = 'block';
         document.body.style.overflow = 'hidden';
-    }
-
-    closeHeartModal() {
-        document.getElementById('heart-modal').classList.remove('active');
-        document.body.style.overflow = '';
-        document.getElementById('heart-comment').value = '';
-        document.getElementById('heart-amount').value = '1';
-        const searchInput = document.getElementById('heart-recipient-search');
-        if (searchInput) searchInput.value = '';
-        this.hideError('heart-recipient-error');
     }
 
     setupHeartRecipientList() {
@@ -1364,6 +1645,7 @@ showPurchaseSuccessModal(item, order) {
             this.hideError('heart-recipient-error');
         });
     }
+ 
 
     async submitHeart() {
         const searchInput = document.getElementById('heart-recipient-search');
@@ -1445,7 +1727,7 @@ showPurchaseSuccessModal(item, order) {
             this.updateProfile();
             this.loadColleaguesList();
             
-            this.closeHeartModal();
+            this.closeAllModals();
             alert(`✅ ${amount} сердечек отправлено ${recipient.name}!`);
             
         } catch (error) {
@@ -1461,13 +1743,13 @@ window.login = () => app.login();
 window.logout = () => app.logout();
 window.showSection = (id) => app.showSection(id);
 window.buyItem = (id) => app.buyItem(id);
-window.closeUserModal = () => app.closeUserModal();
-window.closeItemModal = () => app.closeItemModal();
-window.closeCoinsModal = () => app.closeCoinsModal();
+window.closeUserModal = () => app.closeAllModals(); // Используем общий метод
+window.closeItemModal = () => app.closeAllModals();
+window.closeCoinsModal = () => app.closeAllModals();
 window.submitCoinsOperation = () => app.submitCoinsOperation();
-window.closeHeartModal = () => app.closeHeartModal();
+window.closeHeartModal = () => app.closeAllModals();
 window.submitHeart = () => app.submitHeart();
-window.closeAdminModal = () => app.closeAdminModal();
+window.closeAdminModal = () => app.closeAllModals();
 window.submitAdminOperation = () => app.submitAdminOperation();
 
 // Инициализация
@@ -1483,6 +1765,7 @@ window.addEventListener('load', function() {
     console.log('✅ OrdersManager:', typeof window.OrdersManager !== 'undefined');
     console.log('✅ NotificationsManager:', typeof window.NotificationsManager !== 'undefined');
     console.log('✅ ordersPanel:', typeof window.ordersPanel !== 'undefined');
+    console.log('✅ AchievementsManager:', typeof window.AchievementsManager !== 'undefined');
     
     // Если модули не загрузились, показываем сообщение
     if (typeof window.ordersPanel === 'undefined') {
