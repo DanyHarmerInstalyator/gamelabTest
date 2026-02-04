@@ -896,7 +896,7 @@ createTumbleweedAnimation() {
                 <div class="pebble2"></div>
                 <div class="pebble3"></div>
             </div>
-            <p>Пока нет достижений.<br>${window.MUG_ACHIEVEMENT?.description || 'Используй фирменную кружку и получи 2 Bus‑коина!'}</p>
+            <p>Пока нет достижений.<br>${window.MUG_ACHIEVEMENT?.description || 'Использую фирменную кружку'}</p>
         </div>
     `;
 }
