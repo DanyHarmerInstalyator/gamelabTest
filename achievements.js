@@ -9,7 +9,7 @@ class AchievementsManager {
             console.warn('⚠️ Данные о достижениях не загружены из config.js');
             window.MUG_ACHIEVEMENT = {
                 name: "Кружка HDL",
-                description: "Используй фирменную кружку на рабочем месте и получи 2 Bus‑коина!",
+                description: "Использую фирменную кружку на рабочем месте",
                 icon: "☕"
             };
         }
